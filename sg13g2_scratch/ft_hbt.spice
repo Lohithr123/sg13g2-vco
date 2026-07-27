@@ -1,0 +1,78 @@
+* fT extraction for IHP SG13G2 npn13G2 HBT
+*
+* fT is the frequency at which the short-circuit current gain h21 falls to
+* unity. Two conditions have to hold or the number means nothing:
+*
+*   1. The base is driven by a CURRENT source, not a voltage source.
+*      h21 is a current gain; drive it with a voltage and you measure
+*      something else entirely.
+*
+*   2. The collector is an AC short to ground.
+*      Satisfied here by tying the collector straight to a DC voltage source:
+*      an ideal source has zero AC impedance, so it holds Vce while shorting
+*      every AC frequency. No RF choke required.
+*
+* The AC base current is 1 A, so h21 = ic/ib = ic directly, no division needed.
+*
+* fT is strongly bias-dependent: it climbs with collector current, peaks, then
+* collapses under high injection (the Kirk effect). A datasheet quotes the
+* peak. What matters for a design is WHERE that peak sits, because it fixes
+* the bias current and therefore the power budget.
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerHBT.lib hbt_typ
+
+.param vce=1.0
+
+* Instance syntax taken from IHP's own dc_hbt_13g2 testbench:
+*   XQ1 collector base emitter substrate npn13G2 Nx=1 mm_ok=1
+* mm_ok=1 disables the mismatch model; Nx is the number of emitter fingers.
+XQ1 c b 0 0 npn13G2 Nx=1 mm_ok=1
+
+* Collector bias — and, being a voltage source, the AC short.
+VC c 0 DC {vce}
+
+* Base drive: DC bias plus 1 A of AC.
+IB 0 b DC 10u AC 1
+
+.control
+  set noaskquit
+
+  echo ""
+  echo "   Ib          Ic(mA)      fT(GHz)     beta"
+  echo "   ---------------------------------------------"
+
+  foreach ibval 1u 2u 5u 10u 20u 50u 100u 200u 500u 1m
+    alter IB dc = $ibval
+
+    * Operating point first, for the collector current at this bias.
+    op
+    let ic_dc = abs(i(VC))
+    let beta  = ic_dc / $ibval
+
+    * Sweep well past the expected fT so the 0 dB crossing lies inside range.
+    ac dec 25 1meg 2000g
+
+    * ib_ac = 1 A, so h21 is just the collector current.
+    let h21db = db(abs(i(VC)))
+    meas ac ft when h21db=0 fall=1
+
+    let ic_ma = ic_dc * 1000
+    let ft_ghz = ft / 1e9
+    echo "   $ibval    $&ic_ma    $&ft_ghz    $&beta"
+  end
+
+  echo ""
+  echo "   Peak fT and the current it occurs at are the design-relevant"
+  echo "   numbers. Bias the VCO near that peak."
+  echo ""
+
+  * One clean h21 curve at a mid bias, saved for plotting.
+  alter IB dc = 100u
+  op
+  ac dec 25 1meg 2000g
+  let h21db = db(abs(i(VC)))
+  write ft_hbt.raw h21db
+  echo "   Wrote ft_hbt.raw (h21 in dB at Ib = 100uA).  plot h21db"
+.endc
+
+.end
