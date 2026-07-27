@@ -1,2 +1,5 @@
-simulations/*.raw
 *.raw
+simulations/*.raw
+tank/output/
+**/sub-*/
+*.s1p
