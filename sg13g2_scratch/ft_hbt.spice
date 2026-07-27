@@ -1,78 +1,96 @@
-* fT extraction for IHP SG13G2 npn13G2 HBT
+* fT and device sizing for the IHP SG13G2 npn13G2 HBT
 *
-* fT is the frequency at which the short-circuit current gain h21 falls to
-* unity. Two conditions have to hold or the number means nothing:
+* fT is the frequency at which short-circuit current gain h21 falls to unity.
+* Two conditions must hold:
+*   1. Base driven by a CURRENT source (h21 is a current gain).
+*   2. Collector an AC short to ground — satisfied by tying it straight to a
+*      DC voltage source, which has zero AC impedance by definition.
 *
-*   1. The base is driven by a CURRENT source, not a voltage source.
-*      h21 is a current gain; drive it with a voltage and you measure
-*      something else entirely.
+* AC base current is 1 A, so h21 = ic/ib = ic directly.
 *
-*   2. The collector is an AC short to ground.
-*      Satisfied here by tying the collector straight to a DC voltage source:
-*      an ideal source has zero AC impedance, so it holds Vce while shorting
-*      every AC frequency. No RF choke required.
-*
-* The AC base current is 1 A, so h21 = ic/ib = ic directly, no division needed.
-*
-* fT is strongly bias-dependent: it climbs with collector current, peaks, then
-* collapses under high injection (the Kirk effect). A datasheet quotes the
-* peak. What matters for a design is WHERE that peak sits, because it fixes
-* the bias current and therefore the power budget.
+* Everything below is read out of the AC analysis alone. The first attempt at
+* this computed the DC collector current after an `op` and then tried to print
+* it after the `ac` — but each analysis creates its own plot, so the variable
+* had gone out of scope by then. Instead: h21 at low frequency IS beta, so
+* Ic = beta * Ib can be recovered from the same AC sweep with no cross-plot
+* reference at all.
 
 .lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerHBT.lib hbt_typ
 
 .param vce=1.0
 
-* Instance syntax taken from IHP's own dc_hbt_13g2 testbench:
-*   XQ1 collector base emitter substrate npn13G2 Nx=1 mm_ok=1
-* mm_ok=1 disables the mismatch model; Nx is the number of emitter fingers.
+* collector base emitter substrate — syntax copied from IHP's own testbench
 XQ1 c b 0 0 npn13G2 Nx=1 mm_ok=1
 
-* Collector bias — and, being a voltage source, the AC short.
 VC c 0 DC {vce}
-
-* Base drive: DC bias plus 1 A of AC.
-IB 0 b DC 10u AC 1
+IB 0 b DC 5u AC 1
 
 .control
   set noaskquit
+  option gmin=1e-14
+  option abstol=1e-15
 
   echo ""
-  echo "   Ib          Ic(mA)      fT(GHz)     beta"
-  echo "   ---------------------------------------------"
+  echo "  npn13G2, Nx=1, Vce = 1.0 V, 27 C"
+  echo ""
+  echo "   Ib(uA)     Ic(mA)     beta      fT(GHz)"
+  echo "   ----------------------------------------"
 
-  foreach ibval 1u 2u 5u 10u 20u 50u 100u 200u 500u 1m
+  * Numeric values, no unit suffixes, so they can be used in arithmetic.
+  * Range stops at 50 uA: beyond that a single-finger device is past its
+  * useful current and the solver struggles.
+  foreach ibval 5e-7 1e-6 2e-6 3e-6 5e-6 7e-6 1e-5 1.5e-5 2e-5 3e-5 5e-5
     alter IB dc = $ibval
+    ac dec 25 1e5 2000g
 
-    * Operating point first, for the collector current at this bias.
-    op
-    let ic_dc = abs(i(VC))
-    let beta  = ic_dc / $ibval
-
-    * Sweep well past the expected fT so the 0 dB crossing lies inside range.
-    ac dec 25 1meg 2000g
-
-    * ib_ac = 1 A, so h21 is just the collector current.
     let h21db = db(abs(i(VC)))
-    meas ac ft when h21db=0 fall=1
 
-    let ic_ma = ic_dc * 1000
+    * beta = h21 at low frequency, well below any roll-off.
+    meas ac h21_lf FIND h21db AT=1e5
+    let beta = 10^(h21_lf/20)
+    let ic_ma = beta * $ibval * 1000
+    let ib_ua = $ibval * 1e6
+
+    meas ac ft when h21db=0 fall=1
     let ft_ghz = ft / 1e9
-    echo "   $ibval    $&ic_ma    $&ft_ghz    $&beta"
+
+    echo "   $&ib_ua   $&ic_ma   $&beta   $&ft_ghz"
   end
 
   echo ""
-  echo "   Peak fT and the current it occurs at are the design-relevant"
-  echo "   numbers. Bias the VCO near that peak."
+  echo "  Peak fT sits at low current. Oscillation needs gm, which needs"
+  echo "  current, so the VCO will bias well above peak-fT and trade away"
+  echo "  headroom there is plenty of. Scale current with Nx, not with"
+  echo "  overdriving one finger."
   echo ""
 
-  * One clean h21 curve at a mid bias, saved for plotting.
-  alter IB dc = 100u
-  op
-  ac dec 25 1meg 2000g
+  * ---- device scaling: same current density, more emitter fingers ----
+  echo "  Emitter-finger scaling at Ib = 10 uA per device"
+  echo ""
+  echo "   Nx     Ic(mA)     fT(GHz)"
+  echo "   ---------------------------"
+
+  foreach nxval 1 2 4 8
+    alter XQ1 Nx = $nxval
+    alter IB dc = 1e-5
+    ac dec 25 1e5 2000g
+    let h21db = db(abs(i(VC)))
+    meas ac h21_lf FIND h21db AT=1e5
+    let beta = 10^(h21_lf/20)
+    let ic_ma = beta * 1e-5 * 1000
+    meas ac ft when h21db=0 fall=1
+    let ft_ghz = ft / 1e9
+    echo "   $nxval    $&ic_ma   $&ft_ghz"
+  end
+
+  * ---- one clean h21 curve for plotting ----
+  alter XQ1 Nx = 1
+  alter IB dc = 5e-6
+  ac dec 25 1e5 2000g
   let h21db = db(abs(i(VC)))
   write ft_hbt.raw h21db
-  echo "   Wrote ft_hbt.raw (h21 in dB at Ib = 100uA).  plot h21db"
+  echo ""
+  echo "  Wrote ft_hbt.raw (h21 in dB, Nx=1, Ib=5uA).   plot h21db"
 .endc
 
 .end
