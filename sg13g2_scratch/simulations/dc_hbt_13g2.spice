@@ -1,0 +1,30 @@
+** sch_path: /foss/designs/sg13g2_scratch/dc_hbt_13g2.sch
+**.subckt dc_hbt_13g2
+Vce net3 GND 1.5
+I0 GND net1 1u
+Vc net3 net2 0
+.save i(vc)
+XQ1 net2 net1 GND GND npn13G2 Nx=1 mm_ok=1
+**** begin user architecture code
+
+.lib cornerHBT.lib hbt_typ
+
+
+
+.options savecurrents
+.include dc_hbt_13g2.save
+.param temp=27
+.control
+save all
+op
+write dc_hbt_13g2.raw
+set appendwrite
+dc Vce 0 1.5 0.01 I0 0 5u 0.1u
+write dc_hbt_13g2.raw
+.endc
+
+
+**** end user architecture code
+**.ends
+.GLOBAL GND
+.end

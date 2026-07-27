@@ -1,0 +1,15 @@
+* Place this .save file with a .include line in your testbench
+
+.save @q.xq1.qnpn13g2[gm]
+.save @q.xq1.qnpn13g2[go]
+.save @q.xq1.qnpn13g2[gmu]
+.save @q.xq1.qnpn13g2[gpi]
+.save @q.xq1.qnpn13g2[gx]
+.save @q.xq1.qnpn13g2[vbe]
+.save @q.xq1.qnpn13g2[vbc]
+.save @q.xq1.qnpn13g2[ib]
+.save @q.xq1.qnpn13g2[ic]
+.save @q.xq1.qnpn13g2[cbe]
+.save @q.xq1.qnpn13g2[cbc]
+.save @q.xq1.qnpn13g2[cbep]
+.save @q.xq1.qnpn13g2[cbcp]
