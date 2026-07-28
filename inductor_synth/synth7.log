@@ -10847,3 +10847,162 @@ cp: './inductor2_N2_do70.51_w4_s2.01.s2p' and './inductor2_N2_do70.51_w4_s2.01.s
 cp: './inductor2_N2_do74.24_w4_s3.s2p' and './inductor2_N2_do74.24_w4_s3.s2p' are the same file
 cp: './inductor2_N2_do74.78_w4_s2.01.s2p' and './inductor2_N2_do74.78_w4_s2.01.s2p' are the same file
 cp: './inductor2_N2_do77.43_w4_s3.s2p' and './inductor2_N2_do77.43_w4_s3.s2p' are the same file
+cp: './inductor2_N2_do78.75_w4_s3.s2p' and './inductor2_N2_do78.75_w4_s3.s2p' are the same file
+Created output file inductor2_N2_do74.78_w4_s2.01.gds
+Reading GDSII input file: inductor2_N2_do74.78_w4_s2.01.gds
+Pre-processing GDSII to handle cutouts and self-intersecting polygons
+Using boundary condition  ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+Starting to create mesh file and config file
+---------------------------------------------------
+Wavelength in air: 15000.0 units
+  meshsize_max: 70.0  units
+  max_cellsize_air: 1500.0 units
+---------------------------------------------------
+Adding metal tags ...
+Adding dielectrics ...
+Adding ports ...
+Dielectric  AIR  with max_cellsize_local =  70 units
+Dielectric  Passive  with max_cellsize_local =  70 units
+Dielectric  SiO2  with max_cellsize_local =  70 units
+Dielectric  EPI  with max_cellsize_local =  70 units
+Dielectric  Substrate  with max_cellsize_local =  70 units
+Created output file inductor2_N2_do77.43_w4_s3.gds
+Reading GDSII input file: inductor2_N2_do77.43_w4_s3.gds
+Pre-processing GDSII to handle cutouts and self-intersecting polygons
+Using boundary condition  ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+Starting to create mesh file and config file
+---------------------------------------------------
+Wavelength in air: 15000.0 units
+  meshsize_max: 70.0  units
+  max_cellsize_air: 1500.0 units
+---------------------------------------------------
+Adding metal tags ...
+Adding dielectrics ...
+Adding ports ...
+Dielectric  AIR  with max_cellsize_local =  70 units
+Dielectric  Passive  with max_cellsize_local =  70 units
+Dielectric  SiO2  with max_cellsize_local =  70 units
+Dielectric  EPI  with max_cellsize_local =  70 units
+Dielectric  Substrate  with max_cellsize_local =  70 units
+
+
+There are 2 geometries that meet your specified parameters.
+
+Simulation will start in 10 seconds.
+You can press Ctrl+C now to quit and review your specification, or wait for simulation starting in 10 seconds.
+Created output file inductor2_N2_do70.51_w4_s2.01.gds
+Reading GDSII input file: inductor2_N2_do70.51_w4_s2.01.gds
+Pre-processing GDSII to handle cutouts and self-intersecting polygons
+Using boundary condition  ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+Starting to create mesh file and config file
+---------------------------------------------------
+Wavelength in air: 15000.0 units
+  meshsize_max: 70.0  units
+  max_cellsize_air: 1500.0 units
+---------------------------------------------------
+Adding metal tags ...
+Adding dielectrics ...
+Adding ports ...
+Dielectric  AIR  with max_cellsize_local =  70 units
+Dielectric  Passive  with max_cellsize_local =  70 units
+Dielectric  SiO2  with max_cellsize_local =  70 units
+Dielectric  EPI  with max_cellsize_local =  70 units
+Dielectric  Substrate  with max_cellsize_local =  70 units
+Created output file inductor2_N2_do78.75_w4_s3.gds
+Reading GDSII input file: inductor2_N2_do78.75_w4_s3.gds
+Pre-processing GDSII to handle cutouts and self-intersecting polygons
+Using boundary condition  ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+Starting to create mesh file and config file
+---------------------------------------------------
+Wavelength in air: 15000.0 units
+  meshsize_max: 70.0  units
+  max_cellsize_air: 1500.0 units
+---------------------------------------------------
+Adding metal tags ...
+Adding dielectrics ...
+Adding ports ...
+Dielectric  AIR  with max_cellsize_local =  70 units
+Dielectric  Passive  with max_cellsize_local =  70 units
+Dielectric  SiO2  with max_cellsize_local =  70 units
+Dielectric  EPI  with max_cellsize_local =  70 units
+Dielectric  Substrate  with max_cellsize_local =  70 units
+Created output file inductor2_N2_do74.24_w4_s3.gds
+Reading GDSII input file: inductor2_N2_do74.24_w4_s3.gds
+Pre-processing GDSII to handle cutouts and self-intersecting polygons
+Using boundary condition  ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+Starting to create mesh file and config file
+---------------------------------------------------
+Wavelength in air: 15000.0 units
+  meshsize_max: 70.0  units
+  max_cellsize_air: 1500.0 units
+---------------------------------------------------
+Adding metal tags ...
+Adding dielectrics ...
+Adding ports ...
+Dielectric  AIR  with max_cellsize_local =  70 units
+Dielectric  Passive  with max_cellsize_local =  70 units
+Dielectric  SiO2  with max_cellsize_local =  70 units
+Dielectric  EPI  with max_cellsize_local =  70 units
+Dielectric  Substrate  with max_cellsize_local =  70 units
+Created output file inductor2_N2_do66.22_w4_s2.01.gds
+Reading GDSII input file: inductor2_N2_do66.22_w4_s2.01.gds
+Pre-processing GDSII to handle cutouts and self-intersecting polygons
+Using boundary condition  ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+Starting to create mesh file and config file
+---------------------------------------------------
+Wavelength in air: 15000.0 units
+  meshsize_max: 70.0  units
+  max_cellsize_air: 1500.0 units
+---------------------------------------------------
+Adding metal tags ...
+Adding dielectrics ...
+Adding ports ...
+Dielectric  AIR  with max_cellsize_local =  70 units
+Dielectric  Passive  with max_cellsize_local =  70 units
+Dielectric  SiO2  with max_cellsize_local =  70 units
+Dielectric  EPI  with max_cellsize_local =  70 units
+Dielectric  Substrate  with max_cellsize_local =  70 units
+Now we have done multiple finetune steps for multiple candidates, get the best one
+Created output file inductor2_N2_do73.59_w4_s3.gds
+Reading GDSII input file: inductor2_N2_do73.59_w4_s3.gds
+Pre-processing GDSII to handle cutouts and self-intersecting polygons
+Using boundary condition  ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+WARNING: Start frequency changed from DC to  0.01  GHz!
+Starting to create mesh file and config file
+---------------------------------------------------
+Wavelength in air: 7500.0 units
+  meshsize_max: 70.0  units
+  max_cellsize_air: 750.0 units
+---------------------------------------------------
+Adding metal tags ...
+Adding dielectrics ...
+Adding ports ...
+Dielectric  AIR  with max_cellsize_local =  70 units
+Dielectric  Passive  with max_cellsize_local =  70 units
+Dielectric  SiO2  with max_cellsize_local =  70 units
+Dielectric  EPI  with max_cellsize_local =  70 units
+Dielectric  Substrate  with max_cellsize_local =  70 units
+===============================================================================
+Design goal: inductor2 L=0.45 nH @ 20.0 GHz 
+INITIAL RESULTS (simulation time  33.7 seconds):
+  inductor2_N2_do74.78_w4_s2.01: L=0.51nH Q=6.1, parameters N=2 w=4 s=2.01 do=70.51 -> 70.51
+  inductor2_N2_do77.43_w4_s3: L=0.44nH Q=6.1, parameters N=2 w=4 s=3 do=78.75 -> 78.75
+Finetune step 1 results sorted by Q factor (simulation time  568.8 seconds):
+  inductor2_N2_do70.51_w4_s2.01: L=0.51nH Q=6.9, parameters N=2 w=4 s=2.01 do=66.22 -> 66.22
+  inductor2_N2_do78.75_w4_s3: L=0.51nH Q=7.4, parameters N=2 w=4 s=3 do=74.24 -> 74.24
+Finetune step 2 results sorted by Q factor (simulation time  507.8 seconds):
+  inductor2_N2_do74.24_w4_s3: L=0.46nH Q=6.9, parameters N=2 w=4 s=3 do=73.59 -> 73.59
+  inductor2_N2_do66.22_w4_s2.01: L=0.46nH Q=6.5, parameters N=2 w=4 s=2.01 do=65.45 -> 65.45
+Running final wideband sweep for [{'nturns': 2, 'w': 4, 's': 3, 'd_outer': 73.59}]
+Finished running wideband sweep for inductor2_N2_do73.59_w4_s3 (simulation time  879.2 seconds)
+
+FINAL RESULT:
+  inductor2_N2_do73.59_w4_s3: L=0.45nH Q=6.8 at 20.0 GHz
+  number of turns: 2
+  width: 4.00
+  spacing: 3.00
+  outer diameter: 73.59
+  inner diameter: 51.59
+
+Final GDSII file with SG13G2 OPDK options created as final_inductor2_N2_do73.59_w4_s3.gds
+S-parameter file copied to final_inductor2_N2_do73.59_w4_s3.s2p
