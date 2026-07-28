@@ -1,0 +1,50 @@
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Error   : Could not create line
+Created output file inductor3_N1_do109.03_w4_s0.gds
+Reading GDSII input file: inductor3_N1_do109.03_w4_s0.gds
+Pre-processing GDSII to handle cutouts and self-intersecting polygons
+Using boundary condition  ['ABC', 'ABC', 'ABC', 'ABC', 'ABC', 'ABC']
+Starting to create mesh file and config file
+---------------------------------------------------
+Wavelength in air: 15000.0 units
+  meshsize_max: 70.0  units
+  max_cellsize_air: 1500.0 units
+---------------------------------------------------
+Adding metal tags ...
+Adding dielectrics ...
+Traceback (most recent call last):
+  File "/foss/designs/inductor_synth/synthesize_ihp_inductor_v3.py", line 1087, in <module>
+    palace_config_files, all_models_dict, data_dir = create_models_from_list (geometry_candidates_list, layout_with_centertap, force2port=True)
+                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/foss/designs/inductor_synth/synthesize_ihp_inductor_v3.py", line 890, in create_models_from_list
+    config_name, a_data_dir, geometry_name = create_gds_and_model (nturns, w, s, d_outer, layout_with_centertap, force2port)
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/foss/designs/inductor_synth/synthesize_ihp_inductor_v3.py", line 863, in create_gds_and_model
+    config_name, data_dir = create_simulation_model (gds_filename, settings, geometry_name, port_layer_name, ground_layer_name, centertap_layername, force2port)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/foss/designs/inductor_synth/synthesize_ihp_inductor_v3.py", line 791, in create_simulation_model
+    config_name, data_dir = simulation_setup.create_palace (excite_ports, settings)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/gds2palace/util_simulation_setup.py", line 983, in create_palace
+    config_name, data_dir = create_model (excite_ports, settings)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/gds2palace/util_simulation_setup.py", line 1307, in create_model
+    assert dielectric_tags_unchanged
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

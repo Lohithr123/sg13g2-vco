@@ -350,3 +350,36 @@ Multithreaded Engine: Best performance found using 2 threads.
 [@    44m45s] Timestep:       194546 || Speed:  246.3 MC/s (1.368e-02 s/TS) || Energy: ~5.65e-21 (-49.53dB)
 [@    45m20s] Timestep:       197175 || Speed:  248.7 MC/s (1.355e-02 s/TS) || Energy: ~5.27e-21 (-49.83dB)
 [@    45m57s] Timestep:       199804 || Speed:  241.1 MC/s (1.397e-02 s/TS) || Energy: ~4.92e-21 (-50.13dB)
+Time for 199804 iterations with 3368640.00 cells : 2757.38 sec
+Speed: 244.10 MCells/s 
+Simulation data directory:  /foss/designs/tank/output/run_inductor_diffport_data
+Reading XML stackup  file: SG13G2.xml
+Reading GDSII input file: L_2n0_simplified.gds
+
+________________________
+Mesh cells by axis (total 3430 kcells):
+ x = 264
+ y = 232
+ z = 56
+Smallest cell size:
+ dx = 0.8766
+ dy = 0.8766
+ dz = 0.4000
+________________________
+
+Starting AppCSXCAD 3D viewer with file: 
+ /foss/designs/tank/output/run_inductor_diffport_data/sub-1/run_inductor_diffport.xml
+Close AppCSXCAD to continue or press <Ctrl>-C to abort
+Starting FDTD simulation for excitation  [1]
+FDTD simulation completed successfully for excitation  [1]
+Creating  S-parameter file
+
+Differential inductor parameters
+Frequency [GHz]: 10.050
+Series L  [nH] : 1.987
+Series R  [Ohm]: 6.144
+Q factor       : 20.43
+----------------------
+L_DC      [nH] : 1.676
+R_DC      [Ohm]: 1.605
+Peak Q         : 20.78

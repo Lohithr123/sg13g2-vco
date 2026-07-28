@@ -1,0 +1,7 @@
+#!/bin/bash
+START_DIR="$PWD"
+cd /foss/designs/inductor_synth/palace_model/inductor2_N2_do73.59_w4_s3_data
+run_palace config.json
+cd "$START_DIR"
+combine_snp
+find . -type f -name "*.s*p" -exec cp {} . \;

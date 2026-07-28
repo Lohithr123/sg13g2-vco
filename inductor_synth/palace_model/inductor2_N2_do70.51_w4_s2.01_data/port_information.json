@@ -1,0 +1,32 @@
+{
+    "ports": [
+        {
+            "portnumber": 1,
+            "Z0": 50,
+            "direction": "Z",
+            "length": 4.97029999999998,
+            "width": 2.0,
+            "xmin": -3.0,
+            "xmax": -1.0,
+            "ymin": -65.26,
+            "ymax": -65.16,
+            "zmin": 185.21,
+            "zmax": 190.1803
+        },
+        {
+            "portnumber": 2,
+            "Z0": 50,
+            "direction": "Z",
+            "length": 4.97029999999998,
+            "width": 2.0,
+            "xmin": 1.0,
+            "xmax": 3.0,
+            "ymin": -65.26,
+            "ymax": -65.16,
+            "zmin": 185.21,
+            "zmax": 190.1803
+        }
+    ],
+    "unit": 1e-06,
+    "name": "inductor2_N2_do70.51_w4_s2.01"
+}
