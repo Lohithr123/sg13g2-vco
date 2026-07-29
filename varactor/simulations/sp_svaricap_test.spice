@@ -1,0 +1,65 @@
+** sch_path: /foss/designs/varactor/sp_svaricap_test.sch
+**.subckt sp_svaricap_test
+XC1 net1 net2 net4 sub! sg13_hv_svaricap w=3.74u l=0.3u Nx=10 mm_ok=1
+V1 net2 GND 3.5
+Vg1 net3 GND dc Vg
+C2 net1 net6 1m
+L3 net1 net3 1m
+C3 net4 net5 1m
+L4 net4 net7 1m
+Vg2 net7 GND dc Vg
+V2 net6 GND dc 0 ac 1 portnum 1 z0 50
+V3 net5 GND dc 0 ac 1 portnum 2 z0 50
+**** begin user architecture code
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerCAP.lib cap_typ
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerRES.lib res_typ
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOShv.lib mos_tt
+
+
+
+*.param temp=27
+.param Vg=0
+.control
+save all
+let points=71
+set vgsp=$&points
+set scratch=$curplot
+
+let c_diff=vector($vgsp)
+let r_diff=vector($vgsp)
+let q_diff=vector($vgsp)
+let Vg=vector($vgsp)
+let ind=0
+#let Vgate=vector($vgsp)
+while ind<$vgsp
+  let v1_act= 0.0+ind*0.1
+  *let Vgate=v1_act
+  alter Vg1 = v1_act
+  print Vg1
+  alter Vg2 = v1_act
+  sp lin 1 20GHz 20GHz
+  let s11_diff=(s_1_1+s_2_2-s_1_2-s_2_1)/2
+  let z11_diff=2*50*(1+s11_diff)/(1-s11_diff)
+  let c_diff[ind]=-1/imag(z11_diff)/(2*pi*20e9)
+  let r_diff[ind]=real(z11_diff)
+  let q_diff[ind]=-imag(z11_diff)/real(z11_diff)
+  let Vg[ind]=v1_act-3.5
+  let ind=ind+1
+  destroy sp1
+end
+*setplot $scratch
+wrdata sg13_lv_svaricap_cdiff.csv const.vg const.c_diff
+wrdata sg13_lv_svaricap_qdiff.csv const.vg const.q_diff
+echo
+print const.vg const.c_diff
+
+
+*plot i(v1)
+.endc
+
+
+**** end user architecture code
+**.ends
+.GLOBAL GND
+.end
