@@ -64,7 +64,8 @@ while ind<$vgsp
   let ind=ind+1
   destroy sp1
 end
-*setplot $scratch
+setscale const.vg $ wrdata needs an independent variable: the
+                                 $ const plot has none, so it writes one row
 wrdata sg13_lv_svaricap_cdiff.csv const.vg const.c_diff
 wrdata sg13_lv_svaricap_qdiff.csv const.vg const.q_diff
 echo
