@@ -1,0 +1,186 @@
+* Cross-coupled LC VCO with 4-bit switched-capacitor bank — IHP SG13G2
+*
+* WHY A BANK RATHER THAN A BIGGER VARACTOR
+*
+* Wide tuning from one large varactor works, but it makes KVCO enormous. An
+* Nx=40 varactor covering 18.0-22.8 GHz gives 1458 MHz/V, so a millivolt of
+* noise on the tune line becomes 1.5 MHz of frequency wobble — which lands
+* straight in the phase noise the tank Q was protecting.
+*
+* Splitting the job fixes that. A binary-weighted bank of switched capacitors
+* selects a coarse band; a small varactor tunes continuously within it. Same
+* total range, roughly a tenth of the KVCO, and a SMALLER varactor, so tank Q
+* improves too.
+*
+*   single Nx=40 varactor   18.00-22.81 GHz   KVCO 1458 MHz/V
+*   4-bit bank + Nx=4       17.63-23.00 GHz   KVCO 113-231 MHz/V
+*
+* SIZING (0.45 nH tank, 15 fF of measured device capacitance)
+*   C for 23 GHz            106.4 fF
+*   C for 18 GHz            173.7 fF
+*   bank must swing          67.3 fF over 16 bands -> LSB 4.49 fF
+*   binary weights           4.5 / 9.0 / 18.0 / 35.9 fF
+*   varactor bridges 1 LSB with 60% overlap -> Nx=4, giving 9.0-16.4 fF
+*   fixed cap                82.4 fF
+*
+* THE SWITCHES ARE THE HARD PART
+* Each branch is a capacitor in series with an NMOS switch. On, the switch adds
+* Ron and degrades that branch's Q; off, its drain capacitance still loads the
+* tank. Wider switches lower Ron but raise the off-state parasitic, and the two
+* pull against each other. Rough figures for the MSB branch (35.9 fF at 20 GHz):
+*   W=10um  Ron ~20 ohm  Q ~11    (comparable to the inductor — too lossy)
+*   W=40um  Ron ~5 ohm   Q ~44    (well above tank Q — acceptable)
+*   W=80um  Ron ~2.5 ohm Q ~89    (better still, but the off-capacitance grows)
+* W is swept below so the trade can be measured rather than argued about.
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerHBT.lib hbt_typ
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib mos_tt
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOShv.lib mos_tt
+
+.param vcc    = 3.3
+.param itail  = 3m
+.param cfix   = 82.4f
+.param vtune  = 1.65
+.param vgbias = 1.65
+.param cc     = 4p
+.param rbias  = 10k
+
+* bank control bits, 0 or vcc
+.param b0 = 0
+.param b1 = 0
+.param b2 = 0
+.param b3 = 0
+
+.param wsw  =4u
+.param clsb = 4.49f
+
+VCC vcc 0 DC {vcc}
+
+* ---------------- tank ----------------
+L1 vcc n1 0.225n
+R1 n1  outp 4.15
+L2 vcc n2 0.225n
+R2 n2  outn 4.15
+
+CT outp outn {cfix}
+
+* ---------------- varactor, DC-blocked ----------------
+* Coupling caps keep the varactor's DC bias independent of the tank, so the
+* device can sit on the steep centre of its C-V curve instead of the flat top.
+CC1 outp gp {cc}
+CC2 outn gn {cc}
+RB1 gp vg {rbias}
+RB2 gn vg {rbias}
+VGB vg 0 DC {vgbias}
+XCV gp vt gn 0 sg13_hv_svaricap l=0.3u w=3.74u Nx=4 Ny=1 mm_ok=1
+VTUNE vt 0 DC {vtune}
+
+* ---------------- 4-bit switched capacitor bank ----------------
+* Each branch: differential cap pair with the switch between their midpoints.
+* Splitting the capacitor either side of the switch keeps the structure
+* symmetric, which matters for a differential tank — a single-ended switch
+* would unbalance it.
+CB0A outp s0a {2*clsb}
+CB0B outn s0b {2*clsb}
+XSW0 s0a nb0 s0b 0 sg13_lv_nmos w={wsw} l=0.13u ng=1 m=1
+
+CB1A outp s1a {4*clsb}
+CB1B outn s1b {4*clsb}
+XSW1 s1a nb1 s1b 0 sg13_lv_nmos w={2*wsw} l=0.13u ng=1 m=1
+
+CB2A outp s2a {8*clsb}
+CB2B outn s2b {8*clsb}
+XSW2 s2a nb2 s2b 0 sg13_lv_nmos w={4*wsw} l=0.13u ng=1 m=1
+
+CB3A outp s3a {16*clsb}
+CB3B outn s3b {16*clsb}
+XSW3 s3a nb3 s3b 0 sg13_lv_nmos w={8*wsw} l=0.13u ng=1 m=1
+
+VB0 nb0 0 DC {b0}
+VB1 nb1 0 DC {b1}
+VB2 nb2 0 DC {b2}
+VB3 nb3 0 DC {b3}
+
+* Bleed resistors hold the switch source/drain nodes at a defined DC level when
+* the switch is off. Without them those nodes float and the operating point is
+* undefined, which is a classic way to get a simulation that will not converge.
+RBL0A s0a 0 100k
+RBL0B s0b 0 100k
+RBL1A s1a 0 100k
+RBL1B s1b 0 100k
+RBL2A s2a 0 100k
+RBL2B s2b 0 100k
+RBL3A s3a 0 100k
+RBL3B s3b 0 100k
+
+* ---------------- cross-coupled pair ----------------
+XQ1 outp outn e 0 npn13G2 Nx=1 mm_ok=1
+XQ2 outn outp e 0 npn13G2 Nx=1 mm_ok=1
+
+ITAIL e 0 DC {itail}
+
+.ic v(outp)=3.35 v(outn)=3.25
+
+.control
+  set noaskquit
+
+  echo ""
+  echo "  4-bit switched-cap bank VCO, SG13G2"
+  echo "  L 0.45nH, Cfix 82.4 fF, LSB 4.49 fF, varactor Nx=4, Itail 3 mA"
+  echo ""
+  echo "   code   f_min(GHz)  f_max(GHz)  KVCO(MHz/V)  swing(Vpp)"
+  echo "   ---------------------------------------------------------"
+
+  * Walk the bank from all-off (highest frequency) to all-on (lowest), and at
+  * each code measure the two ends of the varactor's range.
+  foreach code 0 1 5 10 15
+    * decompose the code into bits
+    let c = $code
+    let bit0 = c % 2
+    let bit1 = floor(c/2) % 2
+    let bit2 = floor(c/4) % 2
+    let bit3 = floor(c/8) % 2
+    alter VB0 dc = $&bit0 * 3.3
+    alter VB1 dc = $&bit1 * 3.3
+    alter VB2 dc = $&bit2 * 3.3
+    alter VB3 dc = $&bit3 * 3.3
+
+    * varactor at minimum capacitance -> top of this band
+    alter VTUNE dc = 3.3
+    tran 0.2p 6n
+    let vd = v(outp) - v(outn)
+    meas tran ta WHEN vd=0 RISE=80
+    meas tran tb WHEN vd=0 RISE=90
+    let fmax = 10/(tb-ta)/1e9
+    meas tran vx MAX vd FROM=4n TO=6n
+    meas tran vn MIN vd FROM=4n TO=6n
+    let vpp = vx - vn
+    destroy tran1
+
+    * varactor at maximum capacitance -> bottom of this band
+    alter VTUNE dc = 0
+    tran 0.2p 6n
+    let vd = v(outp) - v(outn)
+    meas tran ta WHEN vd=0 RISE=80
+    meas tran tb WHEN vd=0 RISE=90
+    let fmin = 10/(tb-ta)/1e9
+    destroy tran1
+
+    let kvco = (fmax - fmin) * 1000 / 3.3
+    echo "   $code     $&fmin     $&fmax     $&kvco     $&vpp"
+  end
+
+  echo ""
+  echo "  Bands should overlap: the top of band N must sit above the bottom of"
+  echo "  band N-1, or there are frequencies the VCO cannot reach. That is what"
+  echo "  the 60% varactor overlap is for, and it is the thing to check first."
+  echo ""
+  echo "  KVCO should be a few hundred MHz/V in every band, against 1458 MHz/V"
+  echo "  for the equivalent single-varactor design."
+  echo ""
+
+  write vco_swbank.raw vd v(outp) v(outn)
+  echo "  Wrote vco_swbank.raw."
+.endc
+
+.end

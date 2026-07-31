@@ -1,0 +1,137 @@
+* Cross-coupled LC VCO with DC-blocked varactor — IHP SG13G2, 20 GHz
+*
+* WHY THIS VERSION EXISTS
+*
+* The previous build tied the varactor gates straight to the tank, which sits
+* at Vcc = 3.3 V DC. The varactor therefore saw Vg - Vw = 3.3 - vtune, so
+* sweeping vtune over the full 0-3.3 V supply only walked the C-V curve from
+* +3.3 V down to 0 V of gate-well bias. Measured C-V says that region is almost
+* flat (40.6 fF at +2.0 V, 41.1 fF at +3.5 V), and the simulated result agreed:
+* 19.47-19.92 GHz, a useless 2.3% tuning range, with nothing happening at all
+* below vtune = 2.4 V.
+*
+* Fix: break the DC path. Coupling caps isolate the varactor gates from the
+* tank's DC level, and a resistive network biases those gates independently at
+* vgbias. The varactor now sees vgbias - vtune, so with vgbias at mid-supply
+* and vtune swept 0-3.3 V the device covers -1.65 to +1.65 V — the steep centre
+* of the S-curve, which is where the capacitance actually moves.
+*
+* The cost: coupling caps sit in series with the varactor and shrink its
+* effective swing. From the measured 22.6-41.1 fF:
+*     Cc = 100 fF -> 15.6-22.6 fF  (62% of swing lost)
+*     Cc = 400 fF -> 20.3-34.1 fF  (25% lost)
+*     Cc =   1 pF -> 21.6-38.0 fF  (12% lost)
+* 1 pF is used here. Bigger caps keep more swing but cost area and add their
+* own parasitics, so this is a real trade rather than a free fix.
+*
+* Component values, all from earlier simulation on this PDK:
+*   npn13G2   peak fT 415 GHz at Ic ~ 1.8 mA, cliff above 4 mA
+*   tank L    0.45 nH differential, Q 6.8 at 20 GHz (EM extracted)
+*   varactor  22.6-41.1 fF, Q 21.9-30.6 at 20 GHz (Nx=10)
+*   devices   ~15 fF of Cbe+Cbc, measured from the 32 GHz first pass
+*
+* Budget for a 20 GHz centre: 141 - 15 (devices) - 30 (varactor branch) = 96 fF
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerHBT.lib hbt_typ
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOShv.lib mos_tt
+
+.param vcc    = 3.3
+.param cfix   = 96f
+.param itail  = 3m
+.param vtune  = 1.65
+.param vgbias = 1.65
+.param cc     = 1p
+.param rbias  = 10k
+
+VCC vcc 0 DC {vcc}
+
+* ---------------- tank ----------------
+* 0.45 nH is the DIFFERENTIAL inductance, so each half is 0.225 nH and carries
+* half the series loss. Centre tap feeds the supply.
+L1 vcc n1 0.225n
+R1 n1  outp 4.15
+L2 vcc n2 0.225n
+R2 n2  outn 4.15
+
+CT outp outn {cfix}
+
+* ---------------- varactor, DC-blocked ----------------
+CC1 outp gp {cc}
+CC2 outn gn {cc}
+
+* Bias resistors set the gate DC level without loading the tank. 10k against a
+* tank impedance of ~384 ohm is high enough to be nearly invisible at 20 GHz,
+* while still pinning the DC operating point.
+RB1 gp vg {rbias}
+RB2 gn vg {rbias}
+VGB vg 0 DC {vgbias}
+
+* sg13_hv_svaricap pins: G1 W G2 bn
+XCV gp vt gn 0 sg13_hv_svaricap l=0.3u w=3.74u Nx=10 Ny=1 mm_ok=1
+VTUNE vt 0 DC {vtune}
+
+* ---------------- cross-coupled pair ----------------
+* collector base emitter substrate — each base driven by the opposite
+* collector, which is what produces the negative resistance.
+XQ1 outp outn e 0 npn13G2 Nx=1 mm_ok=1
+XQ2 outn outp e 0 npn13G2 Nx=1 mm_ok=1
+
+* ---------------- tail bias ----------------
+* Ideal sink for now. A real mirror comes later; keeping it ideal means any
+* startup failure is the oscillator's fault, not the bias network's.
+ITAIL e 0 DC {itail}
+
+* Asymmetric start. A perfectly balanced oscillator has no reason to begin;
+* real ones are kicked by noise, simulators need telling.
+.ic v(outp)=3.35 v(outn)=3.25
+
+.control
+  set noaskquit
+
+  echo ""
+  echo "  Cross-coupled LC VCO, DC-blocked varactor, SG13G2"
+  echo "  L 0.45nH diff (Rs 8.3 ohm), Cfix 96 fF, Cc 1 pF, Itail 3 mA"
+  echo "  Gate bias 1.65 V, so varactor sees 1.65 - vtune"
+  echo ""
+  echo "   Vtune(V)   Vg-Vw(V)   f(GHz)     swing(Vpp)"
+  echo "   ----------------------------------------------"
+
+  foreach vt 0.0 0.4 0.8 1.2 1.65 2.1 2.5 2.9 3.3
+    alter VTUNE dc = $vt
+
+    * 20 GHz is a 50 ps period; 0.2 ps steps give 250 points per cycle. 6 ns is
+    * ~120 cycles, long enough for the amplitude to settle.
+    tran 0.2p 6n
+
+    let vdiff = v(outp) - v(outn)
+    meas tran t1 WHEN vdiff=0 RISE=80
+    meas tran t2 WHEN vdiff=0 RISE=90
+    let fghz = 10/(t2-t1)/1e9
+
+    meas tran vmax MAX vdiff FROM=4n TO=6n
+    meas tran vmin MIN vdiff FROM=4n TO=6n
+    let vpp = vmax - vmin
+    let vgw = 1.65 - $vt
+
+    echo "   $vt       $&vgw     $&fghz    $&vpp"
+    destroy tran1
+  end
+
+  echo ""
+  echo "  Compare against the previous build: 19.47-19.92 GHz, 2.3% tuning,"
+  echo "  flat below vtune 2.4 V. If the DC block worked, the frequency should"
+  echo "  now move across the whole vtune range rather than only at the top."
+  echo ""
+  echo "  Swing should also rise with frequency: varactor Q climbs as C falls"
+  echo "  (measured 21.9 at Cmax, 30.6 at Cmin), so the tank is less lossy at"
+  echo "  the high-frequency end."
+  echo ""
+
+  alter VTUNE dc = 1.65
+  tran 0.2p 6n
+  let vdiff = v(outp) - v(outn)
+  write vco_dcblock.raw vdiff v(outp) v(outn)
+  echo "  Wrote vco_dcblock.raw at vtune 1.65 V.   plot vdiff"
+.endc
+
+.end
