@@ -1,0 +1,109 @@
+* Cross-coupled LC VCO — IHP SG13G2, 20 GHz target
+*
+* Every component value here comes from earlier simulation on this PDK:
+*
+*   npn13G2   peak fT 415 GHz at Ic ~ 1.8 mA; high-injection cliff above 4 mA
+*   tank L    0.45 nH differential, Q = 6.8 at 20 GHz (openEMS/Palace extracted,
+*             geometry N=2 w=4um s=3um do=73.59um)
+*   varactor  22.6-41.1 fF, ratio 1.82, Q 21.9-30.6 at 20 GHz (Nx=10)
+*
+* From Q = 6.8:  Rs = wL/Q = 56.5/6.8 = 8.3 ohm differential.
+* Tank Rp = Q*wL = 385 ohm, so startup needs gm > 2/Rp = 5.2 mS.
+* At 4x margin that is gm = 20.8 mS, i.e. Ic = gm*VT = only 0.54 mA per device.
+*
+* The bias here is 1.5 mA per device anyway — roughly 11x the startup
+* requirement. Startup margin is not the binding constraint; amplitude is.
+* Phase noise falls as signal power rises, and with tank Q only 5.6 the design
+* needs every dB of swing it can get. 1.5 mA also sits close to peak fT
+* (measured at 1.8 mA) and well below the 4 mA high-injection cliff, so the
+* current is nearly free. If the swing clips hard against the supply, back the
+* tail current off rather than adding margin that is not needed.
+*
+* FIRST PASS: a fixed capacitor stands in for the varactor. One variable at a
+* time — prove it oscillates and find the frequency, then swap the varactor in
+* and measure tuning range. ctank is deliberately low because the transistors
+* contribute their own Cbe and Cbc to the tank, and that share is not yet known.
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerHBT.lib hbt_typ
+
+.param vcc  = 3.3
+.param ctank = 126f
+.param itail = 3m
+
+VCC vcc 0 DC {vcc}
+
+* ---------------- tank ----------------
+* The 0.45 nH is the DIFFERENTIAL inductance, so each half is 0.225 nH and
+* each half carries half the series loss. Centre tap feeds the supply.
+L1 vcc n1 0.225n
+R1 n1  outp 4.15
+L2 vcc n2 0.225n
+R2 n2  outn 4.15
+
+CT outp outn {ctank}
+
+* ---------------- cross-coupled pair ----------------
+* collector base emitter substrate — base of each device driven by the
+* opposite collector, which is what produces the negative resistance.
+XQ1 outp outn e 0 npn13G2 Nx=1 mm_ok=1
+XQ2 outn outp e 0 npn13G2 Nx=1 mm_ok=1
+
+* ---------------- tail bias ----------------
+* Ideal current sink for now. A real mirror comes later; keeping it ideal here
+* means any startup failure is the oscillator's fault, not the bias network's.
+ITAIL e 0 DC {itail}
+
+* Asymmetric initial condition to break the symmetry. A perfectly balanced
+* oscillator sitting at its DC operating point has no reason to start; real
+* ones are kicked by noise, simulators need telling.
+.ic v(outp)=3.35 v(outn)=3.25
+
+.control
+  set noaskquit
+
+  echo ""
+  echo "  Cross-coupled LC VCO, SG13G2"
+  echo "  L = 0.45nH diff (Rs 8.3 ohm), Ctank = 40 fF, Itail = 3 mA"
+  echo ""
+
+  * DC operating point first — confirm the bias is where it was designed to be
+  * before asking whether it oscillates.
+  op
+  echo "  --- operating point ---"
+  print v(outp) v(outn) v(e)
+  print @itail[current]
+  echo ""
+
+  * 20 GHz is a 50 ps period. 0.2 ps steps give 250 points per cycle, which is
+  * enough to resolve the waveform without an enormous data set. 6 ns is about
+  * 120 cycles — long enough for the amplitude to settle.
+  tran 0.2p 6n
+
+  * Measure the period from two crossings late in the run, after startup.
+  let vdiff = v(outp) - v(outn)
+  meas tran t1 WHEN vdiff=0 RISE=80
+  meas tran t2 WHEN vdiff=0 RISE=90
+  let period = (t2 - t1) / 10
+  let fosc = 1/period
+  let fosc_ghz = fosc / 1e9
+
+  * Peak differential amplitude, also measured after settling.
+  meas tran vmax MAX vdiff FROM=4n TO=6n
+  meas tran vmin MIN vdiff FROM=4n TO=6n
+  let vpp = vmax - vmin
+
+  echo ""
+  echo "  --- oscillation ---"
+  echo "  frequency:            $&fosc_ghz GHz"
+  echo "  differential swing:   $&vpp V peak-to-peak"
+  echo ""
+  echo "  If fosc is well above 20 GHz, raise ctank. If below, lower it."
+  echo "  The gap between 141 fF (the ideal-tank figure) and the ctank that"
+  echo "  actually lands on 20 GHz is the transistors' own capacitance."
+  echo ""
+
+  write vco_tran.raw vdiff v(outp) v(outn) v(e)
+  echo "  Wrote vco_tran.raw.   plot vdiff"
+.endc
+
+.end
