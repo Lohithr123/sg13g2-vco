@@ -1,0 +1,174 @@
+* Cross-coupled LC VCO, 0.9 nH tank — IHP SG13G2, 20 GHz
+*
+* WHY THE TANK CHANGED
+*
+* The first working design used a 0.45 nH inductor with Q 6.8, giving a tank
+* Rp of 385 ohm. Re-running the Palace synthesis at 0.9 nH produced a device
+* with Q 9.68 — Q rises with spiral size in this process, which I had assumed
+* would stay flat and it does not. Combined with the doubled inductance:
+*
+*     Rp = Q*wL:   385 ohm  ->  1096 ohm     (2.8x)
+*
+* Phase noise goes as 1/(Q^2 * Psig) with Psig ~ Itail^2 * Rp, so at constant
+* current that is +3.1 dB from Q and +4.6 dB from Rp. The full 7.6 dB is not
+* collectable: 3 mA into 1096 ohm would swing 4.19 Vpp and clip a 3.3 V supply.
+* Taking 2 mA instead gives 2.79 Vpp, +4.1 dB of phase noise, and drops the
+* power from 9.9 to 6.6 mW. Part of the gain is banked as efficiency.
+*
+* The cost is tuning range: device Cbe+Cbc is a fixed 15 fF, which was 11% of
+* a 141 fF tank and is 21% of a 70 fF one. Expect ~14% rather than 17.8%.
+*
+* MEASURED INPUTS (all from earlier simulation on this PDK)
+*   npn13G2    peak fT 415 GHz at Ic ~1.8 mA, high-injection cliff above 4 mA
+*   inductor   0.901 nH, Q 9.68 at 20 GHz, SRF above 40 GHz
+*              (N=2, w=6um, s=3um, do=109.58um; differential extraction)
+*   varactor   22.6-41.1 fF at Nx=10, Q 21.9-30.6; Nx=2 used here
+*   devices    ~15 fF, backed out of the 32 GHz first-pass oscillation
+*
+* SIZING
+*   Rs = wL/Q = 11.70 ohm differential -> 5.85 ohm per half
+*   C for 20 GHz = 70.3 fF
+*   bank covers 18.0-22.5 GHz: C 55.5-86.8 fF, swing 31.2 fF
+*   4-bit binary, LSB 2.08 fF, weights 2.1/4.2/8.3/16.7 fF
+*   varactor bridges 1 LSB x1.6 -> Nx=2 (4.5-8.2 fF)
+*   fixed cap 36.0 fF
+*
+* Switch width stays at 4 um. The earlier sweep (40/10/4/2 um) showed off-state
+* drain capacitance dominates bank authority, and 4 um was the knee: 17.8%
+* tuning with 27% amplitude droop, against 21.2%/35% at 2 um. With a smaller
+* tank the switches matter proportionally more, so this is worth re-checking.
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerHBT.lib hbt_typ
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib mos_tt
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOShv.lib mos_tt
+
+.param vcc    = 3.3
+.param itail  = 2m
+.param cfix   = 36f
+.param vtune  = 1.65
+.param vgbias = 1.65
+.param cc     = 4p
+.param rbias  = 10k
+.param wsw    = 4u
+.param clsb   = 2.08f
+
+.param b0 = 0
+.param b1 = 0
+.param b2 = 0
+.param b3 = 0
+
+VCC vcc 0 DC {vcc}
+
+* ---------------- tank ----------------
+* 0.901 nH differential -> 0.45 nH per half, 5.85 ohm of loss each.
+L1 vcc n1 0.45n
+R1 n1  outp 5.85
+L2 vcc n2 0.45n
+R2 n2  outn 5.85
+
+CT outp outn {cfix}
+
+* ---------------- varactor, DC-blocked ----------------
+* Coupling caps keep the varactor's DC level independent of the tank, so it
+* sits on the steep centre of its C-V curve. Tying it straight to the tank
+* pinned it to the flat top and gave only 2.3% tuning.
+CC1 outp gp {cc}
+CC2 outn gn {cc}
+RB1 gp vg {rbias}
+RB2 gn vg {rbias}
+VGB vg 0 DC {vgbias}
+XCV gp vt gn 0 sg13_hv_svaricap l=0.3u w=3.74u Nx=2 Ny=1 mm_ok=1
+VTUNE vt 0 DC {vtune}
+
+* ---------------- 4-bit switched bank ----------------
+* Split caps with the switch between their midpoints keeps the branch
+* symmetric; a single-ended switch would unbalance the differential tank.
+CB0A outp s0a {2*clsb}
+CB0B outn s0b {2*clsb}
+XSW0 s0a nb0 s0b 0 sg13_lv_nmos w={wsw} l=0.13u ng=1 m=1
+CB1A outp s1a {4*clsb}
+CB1B outn s1b {4*clsb}
+XSW1 s1a nb1 s1b 0 sg13_lv_nmos w={2*wsw} l=0.13u ng=1 m=1
+CB2A outp s2a {8*clsb}
+CB2B outn s2b {8*clsb}
+XSW2 s2a nb2 s2b 0 sg13_lv_nmos w={4*wsw} l=0.13u ng=1 m=1
+CB3A outp s3a {16*clsb}
+CB3B outn s3b {16*clsb}
+XSW3 s3a nb3 s3b 0 sg13_lv_nmos w={8*wsw} l=0.13u ng=1 m=1
+
+VB0 nb0 0 DC {b0}
+VB1 nb1 0 DC {b1}
+VB2 nb2 0 DC {b2}
+VB3 nb3 0 DC {b3}
+
+* Bleed resistors hold the switch nodes at a defined DC level when off.
+* Without them those nodes float and the operating point is undefined.
+RBL0A s0a 0 100k
+RBL0B s0b 0 100k
+RBL1A s1a 0 100k
+RBL1B s1b 0 100k
+RBL2A s2a 0 100k
+RBL2B s2b 0 100k
+RBL3A s3a 0 100k
+RBL3B s3b 0 100k
+
+* ---------------- cross-coupled pair ----------------
+XQ1 outp outn e 0 npn13G2 Nx=1 mm_ok=1
+XQ2 outn outp e 0 npn13G2 Nx=1 mm_ok=1
+
+ITAIL e 0 DC {itail}
+
+.ic v(outp)=3.35 v(outn)=3.25
+
+.control
+  set noaskquit
+
+  echo ""
+  echo "  VCO with 0.9 nH tank, SG13G2"
+  echo "  L 0.901nH (Rs 11.7 ohm, Q 9.68), Cfix 36 fF, LSB 2.08 fF"
+  echo "  varactor Nx=2, switches 4 um, Itail 2 mA"
+  echo ""
+  echo "   code   f_min(GHz)  f_max(GHz)  KVCO(MHz/V)  swing(Vpp)"
+  echo "   ---------------------------------------------------------"
+
+  foreach code 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+    let c = $code
+    let bit0 = c % 2
+    let bit1 = floor(c/2) % 2
+    let bit2 = floor(c/4) % 2
+    let bit3 = floor(c/8) % 2
+    alter VB0 dc = $&bit0 * 3.3
+    alter VB1 dc = $&bit1 * 3.3
+    alter VB2 dc = $&bit2 * 3.3
+    alter VB3 dc = $&bit3 * 3.3
+
+    * top of the band: varactor at minimum capacitance
+    alter VTUNE dc = 3.3
+    tran 0.2p 6n
+    let vd = v(outp) - v(outn)
+    meas tran ta WHEN vd=0 RISE=80
+    meas tran tb WHEN vd=0 RISE=90
+    meas tran vx MAX vd FROM=4n TO=6n
+    meas tran vn MIN vd FROM=4n TO=6n
+    destroy tran1
+
+    * bottom of the band
+    alter VTUNE dc = 0
+    tran 0.2p 6n
+    let vd = v(outp) - v(outn)
+    meas tran tc WHEN vd=0 RISE=80
+    meas tran td WHEN vd=0 RISE=90
+    destroy tran1
+  end
+
+  echo ""
+  echo "  Frequencies come from the ta/tb (band top) and tc/td (band bottom)"
+  echo "  pairs above: f = 10/(tb-ta). Amplitude is vx-vn."
+  echo ""
+  echo "  Expect roughly 18-22.5 GHz. The previous 0.45 nH build managed"
+  echo "  17.7-21.1 GHz at 3 mA; this should cover a similar span on a third"
+  echo "  less power, with 4 dB better phase noise from the higher tank Q."
+  echo ""
+.endc
+
+.end

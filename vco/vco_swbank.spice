@@ -38,7 +38,7 @@
 .lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOShv.lib mos_tt
 
 .param vcc    = 3.3
-.param itail  = 3m
+.param itail  =4.6m
 .param cfix   = 82.4f
 .param vtune  = 1.65
 .param vgbias = 1.65
@@ -51,7 +51,7 @@
 .param b2 = 0
 .param b3 = 0
 
-.param wsw  =4u
+.param wsw  =2u
 .param clsb = 4.49f
 
 VCC vcc 0 DC {vcc}

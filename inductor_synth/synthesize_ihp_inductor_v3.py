@@ -31,12 +31,12 @@ how_many_top_results = 2  # number of best inductors from initial sweep that are
 how_many_finetune_steps = 2 # how many iteration of tune-to-target before selecting the final candidate for full frequency sweep
 
 # CREATE INDUCTOR WITH TARGET VALUE
-Ltarget = 0.45e-9 # target inductance in H
+Ltarget = 0.9e-9 # target inductance in H
 ftarget = 20e9 # design frequency in Hz
 faked_dc = 0.1e9  # do not change, this is the "DC-like" low frequency for data extraction
 
-w_range = [4, 6, 8, 10] # sweep over these width values
-s_range = [2.01, 3, 4]
+w_range = [6, 8] # sweep over these width values
+s_range = [3]
 nturns_range = [2]
 dout_max = 300 # maximum outer diameter in microns
 
