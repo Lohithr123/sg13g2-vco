@@ -1,5 +1,5 @@
 *.raw
-simulations/*.raw
 tank/output/
 **/sub-*/
-*.s1p
+inductor_synth/palace_model/
+*.msh
