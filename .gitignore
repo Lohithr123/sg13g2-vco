@@ -3,3 +3,6 @@ tank/output/
 **/sub-*/
 inductor_synth/palace_model/
 *.msh
+
+vco/spec.txt
+*.txt
