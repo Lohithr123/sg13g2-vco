@@ -1,0 +1,160 @@
+Error: no such device or model name xq1
+******
+** ngspice-46 : Circuit level simulation program
+** Compiled with KLU Direct Linear Solver
+** The U. C. Berkeley CAD Group
+** Copyright 1985-1994, Regents of the University of California.
+** Copyright 2001-2025, The ngspice team.
+** Please get your ngspice manual from https://ngspice.sourceforge.io/docs.html
+** Please file your bug-reports at http://ngspice.sourceforge.net/bugrep.html
+** Creation Date: Mon Jul 27 13:15:13 UTC 2026
+******
+
+Note: No compatibility mode selected!
+
+
+Circuit: * emitter-follower buffer characterisation — ihp sg13g2
+
+
+  Emitter-follower buffer, 20 GHz, SG13G2
+
+   Nx   Ibuf(mA)   Cin(fF)   Av      Zout(ohm)   tank shift
+   ---------------------------------------------------------
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+ Reference value :  0.00000e+00Error: no such device or model name xq1
+Error: no such device or model name xq1
+Error: no such device or model name xq1
+Error: no such device or model name xq1
+Error: no such device or model name xq1
+Error: no such device or model name xq1
+Error: no such device or model name xq1
+Error: no such device or model name xq1
+
+No. of Data Rows : 1
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 17
+cin20               =  8.75465e-15
+avmag               =  6.10129e-01
+   1    2e-3      8.75465   0.610129    12.95    -2.8685 %
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 1
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 17
+cin20               =  8.87274e-15
+avmag               =  6.71369e-01
+   1    4e-3      8.87274   0.671369    6.475    -2.90719 %
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 1
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 17
+cin20               =  9.23563e-15
+avmag               =  6.97733e-01
+   1    6e-3      9.23563   0.697733    4.31667    -3.02609 %
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 1
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 17
+cin20               =  8.75465e-15
+avmag               =  6.10129e-01
+   2    2e-3      8.75465   0.610129    12.95    -2.8685 %
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 1
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 17
+cin20               =  8.87274e-15
+avmag               =  6.71369e-01
+   2    4e-3      8.87274   0.671369    6.475    -2.90719 %
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 1
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 17
+cin20               =  9.23563e-15
+avmag               =  6.97733e-01
+   2    6e-3      9.23563   0.697733    4.31667    -3.02609 %
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 1
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 17
+cin20               =  8.75465e-15
+avmag               =  6.10129e-01
+   4    2e-3      8.75465   0.610129    12.95    -2.8685 %
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 1
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 17
+cin20               =  8.87274e-15
+avmag               =  6.71369e-01
+   4    4e-3      8.87274   0.671369    6.475    -2.90719 %
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 1
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+No. of Data Rows : 17
+cin20               =  9.23563e-15
+avmag               =  6.97733e-01
+   4    6e-3      9.23563   0.697733    4.31667    -3.02609 %
+
+  Cin is the number that matters: two followers add Cin/2 to the
+  differential tank, and the tank is only 76.3 fF to begin with.
+
+  Av below 1 is expected for a follower. How far below shows the
+  divider between 1/gm and the 50 ohm load — 0.79 at 2 mA, 0.89 at
+  4 mA, 0.92 at 6 mA by hand calculation.
+
+  Pick the smallest device and lowest current that still drives the
+  load, because every fF of Cbc comes out of the tuning range.
+
+[?2004hngspice 10 -> quit [K
+[?2004lngspice-46 done

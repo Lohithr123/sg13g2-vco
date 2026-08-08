@@ -1,0 +1,106 @@
+* Emitter-follower buffer characterisation — IHP SG13G2
+*
+* WHY AN EMITTER FOLLOWER
+*
+* A VCO buffer has two jobs that fight each other: isolate the tank from
+* whatever it drives, and add as little capacitance to that tank as possible.
+*
+* With the collector tied to Vcc (an AC ground), the follower's Cbe is
+* bootstrapped — base and emitter move together, so almost no displacement
+* current flows through it. Only Cbc appears at the input, from base to AC
+* ground. A common-emitter stage would give voltage gain but Miller-multiply
+* Cbc by (1+Av), loading the tank several times harder for the same device.
+*
+* Reverse isolation matters too. Whatever the buffer drives — a probe pad, a
+* mixer, a divider — must not pull the oscillator. The follower's collector
+* provides that isolation directly.
+*
+* WHAT IS BEING MEASURED
+*   Cin   the capacitance this thing hangs on the tank. Everything downstream
+*         depends on it, because the tank must be re-sized to compensate.
+*   Av    voltage gain into the load. Below unity for a follower; how far
+*         below tells you the output impedance.
+*   Zout  1/gm plus rb/beta. Sets how hard it can drive 50 ohm.
+*
+* The sweep runs device size against bias current, because the two pull in
+* opposite directions: a bigger device at more current drives better but
+* costs more Cbc, and Cbc is paid straight out of the tank's budget.
+*
+* Present tank at 19.2 GHz is 76.3 fF total, of which the cross-coupled pair
+* already takes 15 fF. Two followers add Cin/2 differentially, so:
+*     Cin 2 fF/side -> -0.65% frequency,  Cin 6 fF/side -> -1.91%
+* Anything under ~6 fF is comfortably correctable by trimming the fixed cap.
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerHBT.lib hbt_typ
+
+.param vcc  = 3.3
+.param nxb  = 2
+.param ibuf = 4m
+.param rl   = 50
+
+VCC vcc 0 DC {vcc}
+
+* Base sits at 3.3 V because that is where the tank nodes sit — the inductor
+* centre tap ties them to the supply. AC 1 drives the input for the
+* small-signal measurement.
+VIN in 0 DC {vcc} AC 1
+
+* collector base emitter substrate
+XQ1 vcc in eout 0 npn13G2 Nx={nxb} mm_ok=1
+
+* Tail current sets gm. An ideal sink here; a real mirror comes later.
+IEE eout 0 DC {ibuf}
+
+* Load. AC-coupled so the follower's DC operating point is not disturbed by
+* the 50 ohm termination.
+CO eout outl 1p
+RL outl 0 {rl}
+
+.control
+  set noaskquit
+
+  echo ""
+  echo "  Emitter-follower buffer, 20 GHz, SG13G2"
+  echo ""
+  echo "   Nx   Ibuf(mA)   Cin(fF)   Av      Zout(ohm)   tank shift"
+  echo "   ---------------------------------------------------------"
+
+  foreach nx 1 2 4
+    foreach ib 2e-3 4e-3 6e-3
+      alter XQ1 Nx = $nx
+      alter IEE dc = $ib
+
+      op
+      ac dec 10 1e9 40e9
+
+      * Input admittance. ngspice's source current flows + to - internally,
+      * so current INTO the circuit is -i(VIN).
+      let yin  = -i(VIN)/v(in)
+      let cinf = imag(yin)/(2*pi*frequency)
+
+      * Read at 20 GHz, which is where it matters.
+      meas ac cin20  FIND cinf AT=20e9
+      meas ac avmag  FIND vm(outl) AT=20e9
+
+      let cfF  = cin20*1e15
+      let zo   = 1/(($ib)/0.0259)
+      let shift = -0.5*(cin20/2)/76.3e-15*100
+
+      echo "   $nx    $ib      $&cfF   $&avmag    $&zo    $&shift %"
+    end
+  end
+
+  echo ""
+  echo "  Cin is the number that matters: two followers add Cin/2 to the"
+  echo "  differential tank, and the tank is only 76.3 fF to begin with."
+  echo ""
+  echo "  Av below 1 is expected for a follower. How far below shows the"
+  echo "  divider between 1/gm and the 50 ohm load — 0.79 at 2 mA, 0.89 at"
+  echo "  4 mA, 0.92 at 6 mA by hand calculation."
+  echo ""
+  echo "  Pick the smallest device and lowest current that still drives the"
+  echo "  load, because every fF of Cbc comes out of the tuning range."
+  echo ""
+.endc
+
+.end
