@@ -6,3 +6,5 @@ inductor_synth/palace_model/
 
 vco/spec.txt
 *.txt
+
+vco/_corner_run.spice
