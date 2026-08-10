@@ -1,0 +1,90 @@
+Warning: Value of resistor rbb1 is too small, set to 1.000000e-12
+Warning: Value of resistor rbb2 is too small, set to 1.000000e-12
+******
+** ngspice-46 : Circuit level simulation program
+** Compiled with KLU Direct Linear Solver
+** The U. C. Berkeley CAD Group
+** Copyright 1985-1994, Regents of the University of California.
+** Copyright 2001-2025, The ngspice team.
+** Please get your ngspice manual from https://ngspice.sourceforge.io/docs.html
+** Please file your bug-reports at http://ngspice.sourceforge.net/bugrep.html
+** Creation Date: Mon Jul 27 13:15:13 UTC 2026
+******
+
+Note: No compatibility mode selected!
+
+
+Circuit: * vco with emitter-follower output buffers — ihp sg13g2
+
+
+  Phase noise, 0.9 nH tank, code 8
+  Long run — several minutes.
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using SPARSE 1.3 as Direct Linear Solver
+
+Initial Transient Solution
+--------------------------
+
+Node                                   Voltage
+----                                   -------
+vcc                                        3.3
+n1                                         3.3
+outp                                      3.35
+n2                                         3.3
+outn                                      3.25
+gp                                        1.65
+gn                                        1.65
+vg                                        1.65
+xcv.w0                                    1.65
+vt                                        1.65
+xcv.2                                     1.65
+xcv.4                                        0
+xcv.bi1                                   1.65
+xcv.bi2                                   1.65
+xcv.w1                             3.65834e-10
+xcv.g2a                                   1.65
+s0a                                          0
+s0b                                          0
+nb0                                          0
+s1a                                          0
+s1b                                          0
+nb1                                          0
+s2a                                          0
+s2b                                          0
+nb2                                          0
+s3a                                  0.0152413
+s3b                                  0.0152413
+nb3                                        3.3
+e                                      2.43453
+xq1.s1                             1.33635e-09
+xq1.t                                  2.35938
+xq2.s1                             1.26867e-09
+xq2.t                                  16.4163
+bp                                        3.35
+bn                                        3.25
+ep                                     2.42696
+xb1.s1                             1.62057e-09
+xb1.t                                  21.2466
+en                                     2.32873
+xb2.s1                             1.62793e-09
+xb2.t                                  23.6316
+lp                                           0
+ln                                           0
+l2#branch                           0.00854701
+l1#branch                          -0.00854701
+vb3#branch                        -3.04827e-07
+vb2#branch                                   0
+vb1#branch                                   0
+vb0#branch                                   0
+vtune#branch                         -2.48e-12
+vgb#branch                         8.28368e-14
+vcc#branch                         -0.00798293
+
+
+Error: memory required (180002400 Bytes)
+       is more than memory available (151785472 Bytes)!
+Setting the output memory is not possible.
+
+ERROR: fatal error in ngspice, exit(1)

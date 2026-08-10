@@ -1,0 +1,192 @@
+* VCO with emitter-follower output buffers — IHP SG13G2
+*
+* WHAT CHANGED AND WHY IT MATTERS
+*
+* Two emitter followers now hang off the tank nodes, one per side. From the
+* standalone characterisation (buf_char.spice), Nx=2 at 4 mA gives:
+*     Cin  8.87 fF per side   ->  4.43 fF differential
+*     Av   0.671 into 50 ohm
+* Nx=1 would save 2.3 fF but costs 1.5 dB of gain; Nx=4 buys 0.08 more gain
+* for nearly double the loading. Nx=2 is the knee.
+*
+* Cfix drops 36 -> 31.6 fF to absorb the 4.43 fF the buffers add, keeping the
+* band centred where it was.
+*
+* THE PART THAT CANNOT BE PREDICTED
+*
+* A follower's input impedance at 20 GHz is not purely capacitive. There is a
+* real part, and it loads the tank in parallel with Rp = 1096 ohm. If that
+* resistance is high the design barely notices; if it is low, tank Q collapses
+* and the phase noise goes with it:
+*     Rin 2000 ohm/side -> Q 9.68 -> 6.25,  phase noise  -3.8 dB
+*     Rin 1000 ohm/side -> Q 9.68 -> 4.62,  phase noise  -6.4 dB
+*     Rin  500 ohm/side -> Q 9.68 -> 3.03,  phase noise -10.1 dB
+*
+* Worse, an emitter follower driving a capacitive load can present a NEGATIVE
+* real input impedance — the classic cause of parasitic oscillation in
+* follower stages. The cure is a small series base resistor, which is why
+* rbb is in the netlist as a parameter rather than assumed to be zero.
+*
+* So this run answers three questions the standalone one could not:
+*   1. where the band actually lands once the buffers are attached
+*   2. how much amplitude survives at the tank
+*   3. what comes out of the 50 ohm load
+*
+* The frequency answer will not match the -2.79% hand estimate exactly,
+* precisely because the loading is complex rather than purely capacitive.
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerHBT.lib hbt_typ
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib mos_tt
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOShv.lib mos_tt
+
+.param vcc    = 3.3
+.param itail  = 2m
+.param cfix   = 31.6f
+.param vtune  = 1.65
+.param vgbias = 1.65
+.param cc     = 4p
+.param rbias  = 10k
+.param wsw    = 4u
+.param clsb   = 2.08f
+
+* buffer
+.param ibuf   = 4m
+.param rbb    = 0
+.param rload  = 50
+
+.param b0 = 0
+.param b1 = 0
+.param b2 = 0
+.param b3 = 3.3
+
+VCC vcc 0 DC {vcc}
+
+* ---------------- tank ----------------
+L1 vcc n1 0.45n
+R1 n1  outp 5.85
+L2 vcc n2 0.45n
+R2 n2  outn 5.85
+
+CT outp outn {cfix}
+
+* ---------------- varactor, DC-blocked ----------------
+CC1 outp gp {cc}
+CC2 outn gn {cc}
+RB1 gp vg {rbias}
+RB2 gn vg {rbias}
+VGB vg 0 DC {vgbias}
+XCV gp vt gn 0 sg13_hv_svaricap l=0.3u w=3.74u Nx=2 Ny=1 mm_ok=1
+VTUNE vt 0 DC {vtune}
+
+* ---------------- 4-bit switched bank ----------------
+CB0A outp s0a {2*clsb}
+CB0B outn s0b {2*clsb}
+XSW0 s0a nb0 s0b 0 sg13_lv_nmos w={wsw} l=0.13u ng=1 m=1
+CB1A outp s1a {4*clsb}
+CB1B outn s1b {4*clsb}
+XSW1 s1a nb1 s1b 0 sg13_lv_nmos w={2*wsw} l=0.13u ng=1 m=1
+CB2A outp s2a {8*clsb}
+CB2B outn s2b {8*clsb}
+XSW2 s2a nb2 s2b 0 sg13_lv_nmos w={4*wsw} l=0.13u ng=1 m=1
+CB3A outp s3a {16*clsb}
+CB3B outn s3b {16*clsb}
+XSW3 s3a nb3 s3b 0 sg13_lv_nmos w={8*wsw} l=0.13u ng=1 m=1
+
+VB0 nb0 0 DC {b0}
+VB1 nb1 0 DC {b1}
+VB2 nb2 0 DC {b2}
+VB3 nb3 0 DC {b3}
+
+RBL0A s0a 0 100k
+RBL0B s0b 0 100k
+RBL1A s1a 0 100k
+RBL1B s1b 0 100k
+RBL2A s2a 0 100k
+RBL2B s2b 0 100k
+RBL3A s3a 0 100k
+RBL3B s3b 0 100k
+
+* ---------------- cross-coupled pair ----------------
+XQ1 outp outn e 0 npn13G2 Nx=1 mm_ok=1
+XQ2 outn outp e 0 npn13G2 Nx=1 mm_ok=1
+ITAIL e 0 DC {itail}
+
+* ---------------- output buffers ----------------
+* Series base resistors are zero by default. If the tank shows signs of
+* instability, or the follower input resistance comes out negative, a few
+* ohms here damps it at the cost of a little gain.
+RBB1 outp bp {rbb}
+RBB2 outn bn {rbb}
+
+XB1 vcc bp ep 0 npn13G2 Nx=2 mm_ok=1
+XB2 vcc bn en 0 npn13G2 Nx=2 mm_ok=1
+IB1 ep 0 DC {ibuf}
+IB2 en 0 DC {ibuf}
+
+* AC-coupled 50 ohm loads, as a probe or the next stage would present.
+CO1 ep lp 1p
+CO2 en ln 1p
+RL1 lp 0 {rload}
+RL2 ln 0 {rload}
+
+.ic v(outp)=3.35 v(outn)=3.25
+
+.control
+  set noaskquit
+  save outp outn
+
+  echo ""
+  echo "  Phase noise, 0.9 nH tank, code 8"
+  echo "  Long run — several minutes."
+  echo ""
+
+  * Settle first. FFT-ing through startup would smear the carrier and bury the
+  * skirt under the transient.
+  * 50 us -> 20 kHz bins. uic continues from the settled state.
+  tran 2p 15u 1n
+
+  let vd = v(outp) - v(outn)
+
+  meas tran ta WHEN vd=0 RISE=900
+  meas tran tb WHEN vd=0 RISE=910
+  let f0 = 10/(tb-ta)
+  let f0g = f0/1e9
+  meas tran vpk MAX vd FROM=13u TO=15u
+
+  echo ""
+  echo "  carrier    $&f0g GHz"
+  echo "  amplitude  $&vpk V peak"
+  echo ""
+
+  * Hann window suppresses leakage; without it the carrier's own sidelobes
+  * swamp everything within a few hundred kHz.
+  set specwindow=hanning
+  fft vd
+  let m = db(mag(vd))
+
+  * L(f) is the skirt power in 1 Hz relative to the carrier, so subtract
+  * 10log10(bin width).
+  let bw = 1/15e-6
+  let corr = db(bw)
+
+  echo "  offset       L(f) dBc/Hz"
+  echo "  --------------------------"
+  meas ac pk FIND m AT=f0
+  foreach off 1e5 2e5 5e5 1e6 2e6 5e6 1e7
+    let ft = f0 + $off
+    meas ac sk FIND m AT=ft
+    let pn = sk - pk - corr
+    let ok = $off/1e3
+    echo "  $&ok kHz      $&pn"
+  end
+
+  echo ""
+  echo "  Check the slope: -20 dB/decade from 100 kHz to 1 MHz is the 1/f^2"
+  echo "  region. Leeson with Q=9.68, Rp=1096 ohm, 1.7 Vpp predicts roughly"
+  echo "  -85 dBc/Hz at 100 kHz and -105 at 1 MHz."
+  echo ""
+
+  write vco_pn.raw vd
+.endc
+
+.end
