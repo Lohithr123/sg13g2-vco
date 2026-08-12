@@ -1,0 +1,120 @@
+* Current mirror design and characterisation — IHP SG13G2
+*
+* WHY THIS COMES BEFORE LAYOUT
+*
+* The VCO netlists so far use ideal current sources:
+*     ITAIL 2 mA   (cross-coupled pair tail)
+*     IB1/IB2 4 mA (emitter-follower buffers)
+* You cannot lay out an ideal source. More importantly, a real mirror brings
+* two effects the ideal one hides:
+*
+*   Finite output impedance. The tail sits at the common emitter node, so a
+*   low ro lets the common mode move with the oscillation, which degrades the
+*   differential balance.
+*
+*   Noise. The tail device's drain current noise is modulated by the switching
+*   pair and upconverted around the carrier. In many real VCOs the tail is the
+*   dominant close-in phase noise contributor, so this can move the -104 dBc/Hz
+*   figure measured with an ideal source.
+*
+* DESIGN CHOICES
+*
+* Channel length well above minimum. Flicker noise goes as 1/(W*L), and the
+* tail's 1/f noise upconverts directly into the 1/f^3 region of the phase
+* noise skirt. 0.13 um would be the wrong choice here even though it is what
+* the switches use; L = 1 um costs area and nothing else that matters.
+*
+* Headroom is not scarce. The common emitter node sits at 2.43 V and the
+* buffer emitters near 2.5 V, so there is room for a cascode if the simple
+* mirror's output impedance turns out too low. Measure first.
+*
+* Reference current is set by a resistor from the supply into a diode-
+* connected device. A resistor reference varies with supply and temperature —
+* a bandgap would not — but it is one component and this is a first pass.
+*
+* WHAT IS MEASURED
+*   W needed for 2 mA and 4 mA at L = 1 um
+*   output impedance ro at the actual operating point
+*   Vdsat, i.e. how much headroom the mirror actually consumes
+*   current error as the output node swings, which is what ro means in practice
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib mos_tt
+
+.param vcc  = 3.3
+.param lm   = 1u
+.param wref = 20u
+.param wout = 20u
+.param rref = 10k
+
+VCC vcc 0 DC {vcc}
+
+* ---- reference branch ----
+* Resistor sets Iref; the diode-connected device converts it to a gate voltage.
+RREF vcc nref {rref}
+XMREF nref nref 0 0 sg13_lv_nmos w={wref} l={lm} ng=1 m=1
+
+* ---- mirror output, swept to find ro ----
+VOUT nout 0 DC 2.4
+XMOUT nout nref 0 0 sg13_lv_nmos w={wout} l={lm} ng=1 m=1
+
+.control
+  set noaskquit
+
+  echo ""
+  echo "  NMOS current mirror, L = 1 um, SG13G2"
+  echo ""
+  echo "   Rref(k)  Wref(um)  Iref(uA)   Wout(um)  Iout(uA)   ratio"
+  echo "   -------------------------------------------------------------"
+
+  * First: what reference current does each resistor give, and what width
+  * does the output device need to reach 2 mA and 4 mA?
+  foreach rr 5k 10k 20k
+    alter RREF resistance = $rr
+    op
+    let iref = -i(vcc)*0    $ placeholder, read the branch below instead
+    meas dc irefv FIND i(VOUT) WHEN v(nout)=2.4
+  end
+
+  echo ""
+  echo "  --- reference current vs resistor ---"
+  foreach rr 2k 5k 10k 20k 50k
+    alter RREF resistance = $rr
+    op
+    let ir = i(RREF)
+    let iu = ir*1e6
+    let vg = v(nref)
+    echo "   Rref $rr : Iref $&iu uA, Vgs $&vg V"
+  end
+
+  echo ""
+  echo "  --- output current vs device width, Rref = 10k ---"
+  alter RREF resistance = 10k
+  foreach ww 10u 20u 40u 80u 160u
+    alter XMOUT w = $ww
+    op
+    let io = -i(VOUT)*1e6
+    echo "   Wout $ww : Iout $&io uA"
+  end
+
+  echo ""
+  echo "  --- output impedance at the operating point ---"
+  echo "   the tail node sits near 2.4 V; sweeping it shows how much the"
+  echo "   current moves, which is what finite ro costs in practice"
+  echo ""
+  alter XMOUT w = 40u
+  dc VOUT 0.2 3.0 0.05
+  meas dc i_low  FIND i(VOUT) AT=0.5
+  meas dc i_mid  FIND i(VOUT) AT=1.5
+  meas dc i_high FIND i(VOUT) AT=2.5
+  let dro = (2.5-1.5)/abs(i_high - i_mid)
+  echo "   ro between 1.5 and 2.5 V: $&dro ohm"
+
+  echo ""
+  echo "  Compare ro against the tank Rp of 1096 ohm. The tail sees the"
+  echo "  common-mode impedance rather than the differential tank, so it does"
+  echo "  not load Rp directly — but a low ro still lets the common mode move"
+  echo "  with the oscillation."
+  echo ""
+.endc
+
+.end

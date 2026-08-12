@@ -1,0 +1,110 @@
+* Cascode current mirror — IHP SG13G2
+*
+* WHY CASCODE
+*
+* The simple mirror measured 6.4 kohm of output impedance at 2 mA. The tail
+* node of a cross-coupled VCO swings at twice the oscillation frequency, so a
+* finite ro lets the tail current modulate with that swing — one of the
+* mechanisms that upconverts tail noise into the phase noise skirt.
+*
+* Stacking a cascode device raises ro to roughly gm*ro^2. With gm ~ 59 mS and
+* ro 6.4 kohm that is about 2.4 Mohm, some 375x better, and it costs one
+* Vdsat of headroom. The tail sits at 2.43 V and the mirror needs about 0.6 V,
+* so the headroom is available and not close to tight.
+*
+* TOPOLOGY: standard (not wide-swing) cascode
+*
+*   vcc --[Rref]-- nc --|M2 diode|-- nb --|M1 diode|-- gnd     reference
+*                        |               |
+*                     gate of M4      gate of M3
+*
+*   nout --|M4 cascode|-- nx --|M3 mirror|-- gnd               output
+*
+* M2 and M1 are both diode-connected, so nc sits at roughly 2*Vgs and the
+* minimum output voltage is Vgs + Vdsat, about 0.6 V. A wide-swing cascode
+* would get that down to 2*Vdsat (~0.25 V) using a separate bias branch, and
+* it is the right choice when headroom is scarce. Here it is not, so the
+* simpler circuit wins — fewer devices, fewer things to mismatch, less layout.
+*
+* A CONSEQUENCE WORTH ANTICIPATING
+*
+* In the simple mirror the output device sat at Vds = 2.4 V against the
+* reference's 0.49 V, and channel-length modulation pushed the current 27-58%
+* ABOVE the ideal ratio. The cascode pins the mirror device's drain near the
+* reference's Vds, which removes that error — so the same Wout will now
+* deliver LESS current, not more. Expect to need a wider output device to hit
+* 2 mA than the 90 um the simple mirror wanted.
+*
+* Two stacked diodes also drop more voltage across Rref, so Iref falls from
+* 281 uA to roughly (3.3 - 0.98)/10k = 232 uA. Both effects push the same way.
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib mos_tt
+
+.param vcc  = 3.3
+.param lm   = 1u
+.param wref = 20u
+.param wout = 90u
+.param rref = 10k
+
+VCC vcc 0 DC {vcc}
+
+* ---------------- reference branch ----------------
+RREF vcc nc {rref}
+
+* drain gate source bulk
+XM2 nc nc nb 0 sg13_lv_nmos w={wref} l={lm} ng=1 m=1
+XM1 nb nb 0  0 sg13_lv_nmos w={wref} l={lm} ng=1 m=1
+
+* ---------------- mirror output ----------------
+VOUT nout 0 DC 2.4
+XM4 nout nc  nx 0 sg13_lv_nmos w={wout} l={lm} ng=1 m=1
+XM3 nx   nb  0  0 sg13_lv_nmos w={wout} l={lm} ng=1 m=1
+
+.control
+  set noaskquit
+
+  echo ""
+  echo "  Cascode NMOS mirror, L = 1 um, Wref = 20 um, Rref = 10 k"
+  echo ""
+
+  op
+  let iref = i(RREF)*1e6
+  let iout = -i(VOUT)*1e6
+  let vnc  = v(nc)
+  let vnb  = v(nb)
+  let vnx  = v(nx)
+  echo "   Iref        $&iref uA"
+  echo "   Iout        $&iout uA"
+  echo "   V(nc)       $&vnc V     (2 x Vgs, sets the cascode gate)"
+  echo "   V(nb)       $&vnb V     (mirror gate)"
+  echo "   V(nx)       $&vnx V     (mirror drain — should sit near V(nb) minus Vgs)"
+  echo ""
+
+  * Sweep the output node. Two things come out of this: the output impedance
+  * in saturation, and the compliance voltage — the point below which the
+  * cascode leaves saturation and the current collapses.
+  dc VOUT 0.1 3.2 0.02
+
+  meas dc i24 FIND i(VOUT) AT=2.4
+  meas dc i14 FIND i(VOUT) AT=1.4
+  let ro = 1.0/abs(i24 - i14)
+  let rok = ro/1e3
+  echo "   ro (1.4 to 2.4 V)   $&rok kohm"
+  echo ""
+
+  * Compliance: walk down until the current has dropped 5% from its value at
+  * 2.4 V. That is the lowest the tail node may go before the mirror stops
+  * behaving like a current source.
+  let itgt = i24*0.95
+  meas dc vmin WHEN i(VOUT)=itgt FALL=1
+  echo "   compliance (5% droop)  $&vmin V"
+  echo "   tail node sits at 2.43 V, so the margin is what is left over."
+  echo ""
+
+  echo "  Compare against the simple mirror: ro was 6.4 kohm at 2 mA."
+  echo "  If ro here is in the hundreds of kohm or better, the cascode has"
+  echo "  done its job and the tail is no longer a soft current source."
+  echo ""
+.endc
+
+.end
