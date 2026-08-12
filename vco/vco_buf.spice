@@ -115,8 +115,9 @@ ITAIL e 0 DC {itail}
 * Series base resistors are zero by default. If the tank shows signs of
 * instability, or the follower input resistance comes out negative, a few
 * ohms here damps it at the cost of a little gain.
-RBB1 outp bp {rbb}
-RBB2 outn bn {rbb}
+* no series base resistor needed — no instability observed
+RBB1 outp bp 0.001
+RBB2 outn bn 0.001
 
 XB1 vcc bp ep 0 npn13G2 Nx=2 mm_ok=1
 XB2 vcc bn en 0 npn13G2 Nx=2 mm_ok=1
