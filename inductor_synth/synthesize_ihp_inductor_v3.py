@@ -35,12 +35,12 @@ Ltarget = 0.9e-9 # target inductance in H
 ftarget = 20e9 # design frequency in Hz
 faked_dc = 0.1e9  # do not change, this is the "DC-like" low frequency for data extraction
 
-w_range = [6, 8] # sweep over these width values
+w_range = [6] # known-good geometry from the 0.9nH run
 s_range = [3]
 nturns_range = [2]
 dout_max = 300 # maximum outer diameter in microns
 
-layout_with_centertap = False # layout with or without center tap
+layout_with_centertap = True # needed to feed Vcc into the tank
 
 # TECHNOLOGY
 XML_filename = "SG13G2_200um.xml"   #  EM simulation stackup data       

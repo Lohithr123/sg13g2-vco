@@ -1,6 +1,6 @@
 #!/bin/bash
 START_DIR="$PWD"
-cd /foss/designs/inductor_synth/palace_model/inductor2_N2_do109.58_w6_s3_data
+cd /foss/designs/inductor_synth/palace_model/inductor3_N2_do110.59_w6_s3_data
 run_palace config.json
 cd "$START_DIR"
 combine_snp

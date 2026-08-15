@@ -1,0 +1,88 @@
+* VCO for LVS — IHP SG13G2
+*
+* Circuit only: no models, no sources, no analysis. Every parameter resolved to
+* a literal, because LVS does not evaluate expressions.
+*
+* Removed from the simulation netlist:
+*   RL1/RL2, CO1/CO2   the 50 ohm test load, not on the chip
+*   IKICK              startup nudge, a simulation artefact
+*   VCC/VTUNE/VGB/VB*  supplies and controls, brought out as pins instead
+*
+* Pins: supply, ground, tune voltage, gate bias, four bank control bits, and
+* the two buffer outputs.
+
+.subckt vco_20g vcc gnd vt vg nb0 nb1 nb2 nb3 outbp outbn
+
+* ---- tank ----
+* L1/L2 are the two halves of the EM-extracted 0.901 nH differential inductor
+* (N=2, w=6um, s=3um, do=109.58um). R1/R2 are its series loss, Q 9.68 at
+* 20 GHz. In layout these become the single inductor instance, so this pair of
+* L+R may need collapsing depending on how the ind_extraction deck reports it.
+L1 vcc n1 0.45n
+R1 n1 outp 5.85
+L2 vcc n2 0.45n
+R2 n2 outn 5.85
+
+* ---- fixed tank capacitance ----
+CT outp outn 31.6f
+
+* ---- varactor, DC-blocked ----
+CC1 outp gp 4p
+CC2 outn gn 4p
+RB1 gp vg 10k
+RB2 gn vg 10k
+XCV gp vt gn gnd sg13_hv_svaricap l=0.3u w=3.74u Nx=2 Ny=1
+
+* ---- 4-bit switched capacitor bank ----
+* clsb = 2.08 fF; each branch is split either side of its switch, so the
+* per-side caps are twice the binary weight.
+CB0A outp s0a 4.16f
+CB0B outn s0b 4.16f
+XSW0 s0a nb0 s0b gnd sg13_lv_nmos w=4u l=0.13u ng=1 m=1
+CB1A outp s1a 8.32f
+CB1B outn s1b 8.32f
+XSW1 s1a nb1 s1b gnd sg13_lv_nmos w=8u l=0.13u ng=1 m=1
+CB2A outp s2a 16.64f
+CB2B outn s2b 16.64f
+XSW2 s2a nb2 s2b gnd sg13_lv_nmos w=16u l=0.13u ng=1 m=1
+CB3A outp s3a 33.28f
+CB3B outn s3b 33.28f
+XSW3 s3a nb3 s3b gnd sg13_lv_nmos w=32u l=0.13u ng=1 m=1
+
+* Bleed resistors hold the switch nodes at a defined DC level when off.
+RBL0A s0a gnd 100k
+RBL0B s0b gnd 100k
+RBL1A s1a gnd 100k
+RBL1B s1b gnd 100k
+RBL2A s2a gnd 100k
+RBL2B s2b gnd 100k
+RBL3A s3a gnd 100k
+RBL3B s3b gnd 100k
+
+* ---- cross-coupled pair ----
+XQ1 outp outn e gnd npn13G2 Nx=1
+XQ2 outn outp e gnd npn13G2 Nx=1
+
+* ---- cascode mirror reference ----
+RREF vcc nc 10k
+XMR2 nc nc nb gnd sg13_lv_nmos w=10u l=1u ng=1 m=1
+XMR1 nb nb gnd gnd sg13_lv_nmos w=10u l=1u ng=1 m=1
+
+* ---- tail mirror, 1.96 mA ----
+XMT2 e nc ntx gnd sg13_lv_nmos w=70u l=1u ng=1 m=1
+XMT1 ntx nb gnd gnd sg13_lv_nmos w=70u l=1u ng=1 m=1
+
+* ---- output buffers ----
+* RBB1/RBB2 were 1 mohm placeholders for optional damping. Omitted here: a
+* 1 mohm resistor is not a layout object, and LVS would look for a device that
+* does not exist. If damping is ever needed they come back as real resistors.
+XB1 vcc outp outbp gnd npn13G2 Nx=2
+XB2 vcc outn outbn gnd npn13G2 Nx=2
+
+* ---- buffer tail mirrors, 4.15 mA each ----
+XMB2A outbp nc nbx1 gnd sg13_lv_nmos w=139u l=1u ng=1 m=1
+XMB1A nbx1 nb gnd gnd sg13_lv_nmos w=139u l=1u ng=1 m=1
+XMB2B outbn nc nbx2 gnd sg13_lv_nmos w=139u l=1u ng=1 m=1
+XMB1B nbx2 nb gnd gnd sg13_lv_nmos w=139u l=1u ng=1 m=1
+
+.ends vco_20g
