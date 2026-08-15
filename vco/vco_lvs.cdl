@@ -1,70 +1,84 @@
 * VCO for LVS — IHP SG13G2
 *
-* Circuit only: no models, no sources, no analysis. Every parameter resolved to
-* a literal, because LVS does not evaluate expressions.
+* SYNTAX NOTE, hard-won
 *
-* Removed from the simulation netlist:
-*   RL1/RL2, CO1/CO2   the 50 ohm test load, not on the chip
-*   IKICK              startup nudge, a simulation artefact
-*   VCC/VTUNE/VGB/VB*  supplies and controls, brought out as pins instead
+* The PDK installs a custom NetlistSpiceReaderDelegate (custom_reader.lvs) that
+* intercepts elements M, C, R, Q, L and D. For those it reads the device model
+* from a MODEL= PARAMETER, not from the positional slot standard SPICE uses:
 *
-* Pins: supply, ground, tune voltage, gate bias, four bank control bits, and
-* the two buffer outputs.
+*     right:  R1 a b 100k MODEL=rhigh
+*     wrong:  R1 a b rhigh 100k        <- model ignored, class lookup fails
+*     wrong:  R1 a b 100k              <- builds a default class with A/B
+*                                         terminals, which collides with the
+*                                         PDK's registered classes
+*
+* Both wrong forms fail with "Invalid terminal name: 'A'", which points at
+* terminals rather than at the model, and sends you looking in the wrong place.
+*
+* Device classes the extractors register (from extract_devices calls):
+*   caps        cap_cmim, rfcmim
+*   resistors   rhigh, rppd, rsil
+*   bipolars    npn13G2, npn13G2l, npn13G2v, pnpMPA
+*   varactor    sg13_hv_svaricap
+*   inductors   inductor, inductor3
+*
+* Choices here: rfcmim for everything capacitive, since the tank runs at
+* 20 GHz and the RF variant is the one characterised for it; rhigh for the
+* 10k and 100k values, which reach those in sane area.
+*
+* Circuit only — no models, no sources, no analysis. Literals throughout
+* because LVS does not evaluate expressions.
 
 .subckt vco_20g vcc gnd vt vg nb0 nb1 nb2 nb3 outbp outbn
 
-* ---- tank ----
-* L1/L2 are the two halves of the EM-extracted 0.901 nH differential inductor
-* (N=2, w=6um, s=3um, do=109.58um). R1/R2 are its series loss, Q 9.68 at
-* 20 GHz. In layout these become the single inductor instance, so this pair of
-* L+R may need collapsing depending on how the ind_extraction deck reports it.
-L1 vcc n1 0.45n
-R1 n1 outp 5.85
-L2 vcc n2 0.45n
-R2 n2 outn 5.85
+* ---- tank inductor ----
+* Three terminals: LA and LB are the tank ends, LC the centre tap feeding the
+* supply. Series loss is not a device — in layout it is a property of the
+* metal, and LVS checks connectivity and device type rather than Q.
+XL1 outp outn vcc inductor3_N2_Do110.59_w6_s3
 
 * ---- fixed tank capacitance ----
-CT outp outn 31.6f
+CT outp outn 31.6f MODEL=rfcmim
 
 * ---- varactor, DC-blocked ----
-CC1 outp gp 4p
-CC2 outn gn 4p
-RB1 gp vg 10k
-RB2 gn vg 10k
+CC1 outp gp 4p MODEL=rfcmim
+CC2 outn gn 4p MODEL=rfcmim
+RB1 gp vg 10k MODEL=rhigh
+RB2 gn vg 10k MODEL=rhigh
 XCV gp vt gn gnd sg13_hv_svaricap l=0.3u w=3.74u Nx=2 Ny=1
 
 * ---- 4-bit switched capacitor bank ----
-* clsb = 2.08 fF; each branch is split either side of its switch, so the
-* per-side caps are twice the binary weight.
-CB0A outp s0a 4.16f
-CB0B outn s0b 4.16f
+* clsb = 2.08 fF. Each branch splits either side of its switch, so the
+* per-side capacitors are twice the binary weight.
+CB0A outp s0a 4.16f MODEL=rfcmim
+CB0B outn s0b 4.16f MODEL=rfcmim
 XSW0 s0a nb0 s0b gnd sg13_lv_nmos w=4u l=0.13u ng=1 m=1
-CB1A outp s1a 8.32f
-CB1B outn s1b 8.32f
+CB1A outp s1a 8.32f MODEL=rfcmim
+CB1B outn s1b 8.32f MODEL=rfcmim
 XSW1 s1a nb1 s1b gnd sg13_lv_nmos w=8u l=0.13u ng=1 m=1
-CB2A outp s2a 16.64f
-CB2B outn s2b 16.64f
+CB2A outp s2a 16.64f MODEL=rfcmim
+CB2B outn s2b 16.64f MODEL=rfcmim
 XSW2 s2a nb2 s2b gnd sg13_lv_nmos w=16u l=0.13u ng=1 m=1
-CB3A outp s3a 33.28f
-CB3B outn s3b 33.28f
+CB3A outp s3a 33.28f MODEL=rfcmim
+CB3B outn s3b 33.28f MODEL=rfcmim
 XSW3 s3a nb3 s3b gnd sg13_lv_nmos w=32u l=0.13u ng=1 m=1
 
 * Bleed resistors hold the switch nodes at a defined DC level when off.
-RBL0A s0a gnd 100k
-RBL0B s0b gnd 100k
-RBL1A s1a gnd 100k
-RBL1B s1b gnd 100k
-RBL2A s2a gnd 100k
-RBL2B s2b gnd 100k
-RBL3A s3a gnd 100k
-RBL3B s3b gnd 100k
+RBL0A s0a gnd 100k MODEL=rhigh
+RBL0B s0b gnd 100k MODEL=rhigh
+RBL1A s1a gnd 100k MODEL=rhigh
+RBL1B s1b gnd 100k MODEL=rhigh
+RBL2A s2a gnd 100k MODEL=rhigh
+RBL2B s2b gnd 100k MODEL=rhigh
+RBL3A s3a gnd 100k MODEL=rhigh
+RBL3B s3b gnd 100k MODEL=rhigh
 
 * ---- cross-coupled pair ----
 XQ1 outp outn e gnd npn13G2 Nx=1
 XQ2 outn outp e gnd npn13G2 Nx=1
 
 * ---- cascode mirror reference ----
-RREF vcc nc 10k
+RREF vcc nc 10k MODEL=rhigh
 XMR2 nc nc nb gnd sg13_lv_nmos w=10u l=1u ng=1 m=1
 XMR1 nb nb gnd gnd sg13_lv_nmos w=10u l=1u ng=1 m=1
 
@@ -73,9 +87,6 @@ XMT2 e nc ntx gnd sg13_lv_nmos w=70u l=1u ng=1 m=1
 XMT1 ntx nb gnd gnd sg13_lv_nmos w=70u l=1u ng=1 m=1
 
 * ---- output buffers ----
-* RBB1/RBB2 were 1 mohm placeholders for optional damping. Omitted here: a
-* 1 mohm resistor is not a layout object, and LVS would look for a device that
-* does not exist. If damping is ever needed they come back as real resistors.
 XB1 vcc outp outbp gnd npn13G2 Nx=2
 XB2 vcc outn outbn gnd npn13G2 Nx=2
 
