@@ -8,3 +8,5 @@ vco/spec.txt
 *.txt
 
 vco/_corner_run.spice
+
+vco/layout/backups/
