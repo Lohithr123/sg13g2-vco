@@ -114,8 +114,8 @@ except Exception as exc:
     print(f"  FAIL  inductor: {exc}")
 
 print("\n=== cross-coupled pair ===")
-place("npn13G2", {"Nx": 1, "Ny": 1}, -40.0, -100.0, label="XQ1")
-place("npn13G2", {"Nx": 1, "Ny": 1},  15.0, -100.0, mirror=True, label="XQ2")
+place("npn13G2", {"Nx": 1, "Ny": 1}, -15.0, -75.0, label="XQ1")
+place("npn13G2", {"Nx": 1, "Ny": 1},  15.0, -75.0, mirror=True, label="XQ2")
 
 print("\n=== switched capacitor bank ===")
 # Four branches stacked vertically. Each is a split capacitor pair with its
@@ -129,26 +129,26 @@ BANK = [
     (-150.0, "33.28f", "32u", "8"),
 ]
 for i, (y, cval, wsw, ngsw) in enumerate(BANK):
-    place("cmim", {"Calculate": "w&l", "C": cval}, -43.0, y, label=f"CB{i}A")
+    place("cmim", {"Calculate": "w&l", "C": cval}, -18.0, y, label=f"CB{i}A")
     place("cmim", {"Calculate": "w&l", "C": cval},  18.0, y, mirror=True,
           label=f"CB{i}B")
     place("nmos", {"w": wsw, "l": "0.13u", "ng": ngsw, "m": "1", "guardRingType": "psub"}, 0.0, y,
           label=f"XSW{i}")
 
 print("\n=== fixed tank capacitor ===")
-place("cmim", {"Calculate": "w&l", "C": "31.6f"}, 0.0, -113.0, label="CT")
+place("cmim", {"Calculate": "w&l", "C": "31.6f"}, 0.0, -88.0, label="CT")
 
 print("\n=== varactor and coupling ===")
 place("SVaricap", {"w": "3.74u", "l": "0.3u", "Nx": 2}, 0.0, -172.0, label="XCV")
 # 4 pF is 51.6 um square — the second largest object after the inductor.
-place("cmim", {"Calculate": "w&l", "C": "4p"}, -100.0, -215.0, label="CC1")
+place("cmim", {"Calculate": "w&l", "C": "4p"}, -75.0, -215.0, label="CC1")
 place("cmim", {"Calculate": "w&l", "C": "4p"},  75.0, -215.0, mirror=True,
       label="CC2")
 
 print("\n=== bias resistors ===")
 # rhigh computes its own length from R. NumberOfSegments would serpentine it
 # if the strip gets unwieldy; left at 1 for now to keep the first pass simple.
-place("rhigh", {"Calculate": "l", "R": "10k", "w": "1u"}, -50.0, -185.0,
+place("rhigh", {"Calculate": "l", "R": "10k", "w": "1u"}, -25.0, -185.0,
       label="RB1")
 place("rhigh", {"Calculate": "l", "R": "10k", "w": "1u"},  25.0, -185.0,
       mirror=True, label="RB2")
@@ -161,7 +161,7 @@ print("\n=== bleed resistors ===")
 # the inductor, so they go in two columns well outside it. They carry no
 # signal current, so distance costs nothing.
 for i in range(4):
-    yb = -225.0 - (i % 2) * 85.0
+    yb = -200.0 - (i % 2) * 85.0
     xb = 150.0 + (i // 2) * 12.0
     place("rhigh", {"Calculate": "l", "R": "100k", "w": "1u"}, -xb, yb,
           label=f"RBL{i}A")
@@ -175,18 +175,18 @@ place("npn13G2", {"Nx": 2, "Ny": 1},  115.0, -95.0, mirror=True, label="XB2")
 print("\n=== cascode mirrors ===")
 # DC only, so distance from the tank costs nothing. Placed well below
 # everything else.
-MY = -295.0
+MY = -270.0
 place("nmos", {"w": "10u", "l": "1u", "ng": "2", "m": "1", "guardRingType": "psub"}, -105.0, MY,
       label="XMR2")
 place("nmos", {"w": "10u", "l": "1u", "ng": "2", "m": "1", "guardRingType": "psub"},  -95.0, MY,
       label="XMR1")
-place("nmos", {"w": "70u", "l": "1u", "ng": "10", "m": "1", "guardRingType": "psub"},  -55.0, MY,
+place("nmos", {"w": "70u", "l": "1u", "ng": "10", "m": "1", "guardRingType": "psub"},  -30.0, MY,
       label="XMT2")
 place("nmos", {"w": "70u", "l": "1u", "ng": "10", "m": "1", "guardRingType": "psub"},   30.0, MY,
       label="XMT1")
 place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"}, -105.0, MY - 25,
       label="XMB2A")
-place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  -60.0, MY - 25,
+place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  -35.0, MY - 25,
       label="XMB1A")
 place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},   35.0, MY - 25,
       mirror=True, label="XMB2B")
