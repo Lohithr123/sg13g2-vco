@@ -122,19 +122,11 @@ print("\n=== switched capacitor bank ===")
 # switch between them, so the branch stays symmetric about x = 0 — a
 # single-ended switch would unbalance the tank.
 BANK = [
-    # (y, per-side cap value, switch width, switch fingers)
-    #
-    # 10 fF is the smallest cmim that passes DRC — below that the TopMetal1
-    # top plate falls under minimum width (TM1.a). The designed 4-bit bank
-    # wanted 4.16 and 8.32 fF caps, which cannot be built.
-    #
-    # The split-capacitor topology rescues it: two caps in series either side
-    # of the switch, so a 10 fF pair gives a 5 fF branch. A 2-bit bank at
-    # 5 fF LSB spans 15 fF and gives ~13.6% tuning — slightly more than the
-    # unbuildable 4-bit design, because the steps are coarser but the span is
-    # wider. The cost is 4 bands instead of 16, so KVCO rises roughly 4x.
-    (-108.0, "10f", "8u",  "2"),
-    (-130.0, "20f", "16u", "4"),
+    # (y, cap value, switch width)
+    (-108.0, "4.16f",  "4u",  "1"),
+    (-122.0, "8.32f",  "8u",  "2"),
+    (-136.0, "16.64f", "16u", "4"),
+    (-150.0, "33.28f", "32u", "8"),
 ]
 for i, (y, cval, wsw, ngsw) in enumerate(BANK):
     place("cmim", {"Calculate": "w&l", "C": cval}, -43.0, y, label=f"CB{i}A")
@@ -147,7 +139,7 @@ print("\n=== fixed tank capacitor ===")
 place("cmim", {"Calculate": "w&l", "C": "31.6f"}, 0.0, -113.0, label="CT")
 
 print("\n=== varactor and coupling ===")
-place("SVaricap", {"w": "3.74u", "l": "0.3u", "Nx": 4}, 0.0, -172.0, label="XCV")
+place("SVaricap", {"w": "3.74u", "l": "0.3u", "Nx": 2}, 0.0, -172.0, label="XCV")
 # 4 pF is 51.6 um square — the second largest object after the inductor.
 place("cmim", {"Calculate": "w&l", "C": "4p"}, -100.0, -215.0, label="CC1")
 place("cmim", {"Calculate": "w&l", "C": "4p"},  75.0, -215.0, mirror=True,
@@ -168,7 +160,7 @@ print("\n=== bleed resistors ===")
 # 75 um strips. Eight of them will not fit beside the bank without hitting
 # the inductor, so they go in two columns well outside it. They carry no
 # signal current, so distance costs nothing.
-for i in range(2):
+for i in range(4):
     yb = -225.0 - (i % 2) * 85.0
     xb = 150.0 + (i // 2) * 12.0
     place("rhigh", {"Calculate": "l", "R": "100k", "w": "1u"}, -xb, yb,
