@@ -1,0 +1,167 @@
+* VCO with emitter-follower output buffers — IHP SG13G2
+*
+* WHAT CHANGED AND WHY IT MATTERS
+*
+* Two emitter followers now hang off the tank nodes, one per side. From the
+* standalone characterisation (buf_char.spice), Nx=2 at 4 mA gives:
+*     Cin  8.87 fF per side   ->  4.43 fF differential
+*     Av   0.671 into 50 ohm
+* Nx=1 would save 2.3 fF but costs 1.5 dB of gain; Nx=4 buys 0.08 more gain
+* for nearly double the loading. Nx=2 is the knee.
+*
+* Cfix drops 36 -> 31.6 fF to absorb the 4.43 fF the buffers add, keeping the
+* band centred where it was.
+*
+* THE PART THAT CANNOT BE PREDICTED
+*
+* A follower's input impedance at 20 GHz is not purely capacitive. There is a
+* real part, and it loads the tank in parallel with Rp = 1096 ohm. If that
+* resistance is high the design barely notices; if it is low, tank Q collapses
+* and the phase noise goes with it:
+*     Rin 2000 ohm/side -> Q 9.68 -> 6.25,  phase noise  -3.8 dB
+*     Rin 1000 ohm/side -> Q 9.68 -> 4.62,  phase noise  -6.4 dB
+*     Rin  500 ohm/side -> Q 9.68 -> 3.03,  phase noise -10.1 dB
+*
+* Worse, an emitter follower driving a capacitive load can present a NEGATIVE
+* real input impedance — the classic cause of parasitic oscillation in
+* follower stages. The cure is a small series base resistor, which is why
+* rbb is in the netlist as a parameter rather than assumed to be zero.
+*
+* So this run answers three questions the standalone one could not:
+*   1. where the band actually lands once the buffers are attached
+*   2. how much amplitude survives at the tank
+*   3. what comes out of the 50 ohm load
+*
+* The frequency answer will not match the -2.79% hand estimate exactly,
+* precisely because the loading is complex rather than purely capacitive.
+
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerHBT.lib hbt_typ
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib mos_tt
+.lib /foss/pdks/ihp-sg13g2/libs.tech/ngspice/models/cornerMOShv.lib mos_tt
+
+.param vcc    = 3.3
+.param itail  = 2m
+.param cfix   = 31.6f
+.param vtune  = 1.65
+.param vgbias = 1.65
+.param cc     = 4p
+.param rbias  = 10k
+.param wsw    = 4u
+.param clsb   = 2.08f
+
+* buffer
+.param ibuf   = 4m
+.param rbb    = 0
+.param rload  = 50
+
+.param b0 = 0
+.param b1 = 0
+
+VCC vcc 0 DC {vcc}
+
+* ---------------- tank ----------------
+L1 vcc n1 0.45n
+R1 n1  outp 5.85
+L2 vcc n2 0.45n
+R2 n2  outn 5.85
+
+CT outp outn {cfix}
+
+* ---------------- varactor, DC-blocked ----------------
+CC1 outp gp {cc}
+CC2 outn gn {cc}
+RB1 gp vg {rbias}
+RB2 gn vg {rbias}
+VGB vg 0 DC {vgbias}
+XCV gp vt gn 0 sg13_hv_svaricap l=0.3u w=3.74u Nx=4 Ny=1 mm_ok=1
+VTUNE vt 0 DC {vtune}
+
+* ---------------- 4-bit switched bank ----------------
+CB0A outp s0a 10f
+CB0B outn s0b 10f
+XSW0 s0a nb0 s0b 0 sg13_lv_nmos w=8u l=0.13u ng=2 m=1
+CB1A outp s1a 20f
+CB1B outn s1b 20f
+XSW1 s1a nb1 s1b 0 sg13_lv_nmos w=16u l=0.13u ng=4 m=1
+
+VB0 nb0 0 DC {b0}
+VB1 nb1 0 DC {b1}
+
+RBL0A s0a 0 100k
+RBL0B s0b 0 100k
+RBL1A s1a 0 100k
+RBL1B s1b 0 100k
+
+* ---------------- cross-coupled pair ----------------
+XQ1 outp outn e 0 npn13G2 Nx=1 mm_ok=1
+XQ2 outn outp e 0 npn13G2 Nx=1 mm_ok=1
+ITAIL e 0 DC {itail}
+
+* ---------------- output buffers ----------------
+* Series base resistors are zero by default. If the tank shows signs of
+* instability, or the follower input resistance comes out negative, a few
+* ohms here damps it at the cost of a little gain.
+* no series base resistor needed — no instability observed
+RBB1 outp bp 0.001
+RBB2 outn bn 0.001
+
+XB1 vcc bp ep 0 npn13G2 Nx=2 mm_ok=1
+XB2 vcc bn en 0 npn13G2 Nx=2 mm_ok=1
+IB1 ep 0 DC {ibuf}
+IB2 en 0 DC {ibuf}
+
+* AC-coupled 50 ohm loads, as a probe or the next stage would present.
+CO1 ep lp 1p
+CO2 en ln 1p
+RL1 lp 0 {rload}
+RL2 ln 0 {rload}
+
+.ic v(outp)=3.35 v(outn)=3.25
+
+.control
+  set noaskquit
+
+  echo ""
+  echo "  VCO + emitter-follower buffers (Nx=2, 4 mA each)"
+  echo "  Cfix trimmed 36 -> 31.6 fF to absorb the buffer capacitance"
+  echo ""
+  echo "   code   f(GHz)    tank(Vpp)   load(Vpp)   loss(dB)"
+  echo "   ----------------------------------------------------"
+
+  foreach code 0 1 2 3
+    let c = $code
+    let bit0 = c % 2
+    let bit1 = floor(c/2) % 2
+    alter VB0 dc = $&bit0 * 3.3
+    alter VB1 dc = $&bit1 * 3.3
+    alter VTUNE dc = 0
+
+    tran 0.2p 8n
+
+    let vd = v(outp) - v(outn)
+    let vl = v(lp) - v(ln)
+
+    meas tran ta WHEN vd=0 RISE=100
+    meas tran tb WHEN vd=0 RISE=110
+    meas tran tvx MAX vd FROM=6n TO=8n
+    meas tran tvn MIN vd FROM=6n TO=8n
+    meas tran lvx MAX vl FROM=6n TO=8n
+    meas tran lvn MIN vl FROM=6n TO=8n
+    destroy tran1
+  end
+
+  echo ""
+  echo "  Per code: ta/tb give frequency = 10/(tb-ta); tvx-tvn is the tank"
+  echo "  swing; lvx-lvn is what reaches the 50 ohm load."
+  echo ""
+  echo "  Compare the tank swing against 1.75 Vpp unbuffered. Any drop is the"
+  echo "  buffer's input resistance loading the tank, and it costs phase noise"
+  echo "  at 20*log10 of the amplitude ratio."
+  echo ""
+  echo "  Compare the load swing against 0.671 x tank, which is what the"
+  echo "  standalone AC characterisation predicted. A large-signal follower"
+  echo "  driving 50 ohm will do worse than the small-signal number."
+  echo ""
+.endc
+
+.end
