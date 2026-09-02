@@ -389,7 +389,8 @@ produced wrong output rather than erroring:
 ## Reproducing
 
 ```
-git clone <repo>
+git clone https://github.com/Lohithr123/sg13g2-vco.git
+cd sg13g2-vco
 cd designs
 # circuit
 ngspice vco/vco_2bit.spice
