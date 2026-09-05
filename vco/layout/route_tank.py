@@ -80,7 +80,11 @@ for side, xc in (("LA -> XQ1", -9.0), ("LB -> XQ2", 9.0)):
 
     # Metal1 from the via stack down to the collector. The collector metal is
     # 1.86 um wide; keep the run at least that.
-    box(M1, xc - 0.93, vy - bb.height() / 2, xc + 0.93, COLL_Y_TOP)
+    # Run Metal1 THROUGH the via stack rather than up to its bounding box.
+    # The stack's bbox includes TopMetal1, which is wider than its Metal1 pad,
+    # so ending at the bbox edge left a 0.5 um gap that DRC does not flag —
+    # it is an open circuit, not a rule violation.
+    box(M1, xc - 0.93, vy + bb.height() / 2, xc + 0.93, COLL_Y_TOP)
     print(f"           TM1 {PORT_Y_BOT:.1f} -> {vy:.1f}, "
           f"M1 {vy:.1f} -> {COLL_Y_TOP:.1f}")
 
