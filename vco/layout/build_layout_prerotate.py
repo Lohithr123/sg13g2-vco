@@ -83,13 +83,7 @@ def place(pcell, params, x, y, mirror=False, label="", anchor="c"):
         return None
 
     b = layout.cell(ci).dbbox()
-    # DTrans(M90, dx, dy) mirrors FIRST, then translates: a cell whose bbox
-    # centre sits at cx lands at -cx + dx. So the offset that puts it at x is
-    # x + cx when mirrored, x - cx otherwise. Getting this wrong only shows up
-    # on cells whose bbox is not centred on their origin, which is why the
-    # bipolars looked fine and the capacitors did not.
-    dx = (x + b.center().x) if mirror else (x - b.center().x)
-    dy = y - b.center().y
+    dx, dy = x - b.center().x, y - b.center().y
     if anchor == "t":          # hang below y
         dy = y - b.top
     elif anchor == "b":        # sit above y
@@ -150,21 +144,21 @@ for i, (y, cval, wsw, ngsw) in enumerate(BANK):
           label=f"XSW{i}")
 
 print("\n=== fixed tank capacitor ===")
-place("cmim", {"Calculate": "w&l", "C": "31.6f"}, 0.0, -95.0, label="CT")
+place("cmim", {"Calculate": "w&l", "C": "31.6f"}, 0.0, -113.0, label="CT")
 
 print("\n=== varactor and coupling ===")
 place("SVaricap", {"w": "3.74u", "l": "0.3u", "Nx": 4}, 0.0, -172.0, label="XCV")
 # 4 pF is 51.6 um square — the second largest object after the inductor.
-place("cmim", {"Calculate": "w&l", "C": "4p"}, -85.0, -250.0, label="CC1")
-place("cmim", {"Calculate": "w&l", "C": "4p"},  85.0, -250.0, mirror=True,
+place("cmim", {"Calculate": "w&l", "C": "4p"}, -100.0, -215.0, label="CC1")
+place("cmim", {"Calculate": "w&l", "C": "4p"},  75.0, -215.0, mirror=True,
       label="CC2")
 
 print("\n=== bias resistors ===")
 # rhigh computes its own length from R. NumberOfSegments would serpentine it
 # if the strip gets unwieldy; left at 1 for now to keep the first pass simple.
-place("rhigh", {"Calculate": "l", "R": "10k", "w": "1u"}, -45.0, -160.0,
+place("rhigh", {"Calculate": "l", "R": "10k", "w": "1u"}, -50.0, -185.0,
       label="RB1")
-place("rhigh", {"Calculate": "l", "R": "10k", "w": "1u"},  45.0, -160.0,
+place("rhigh", {"Calculate": "l", "R": "10k", "w": "1u"},  25.0, -185.0,
       mirror=True, label="RB2")
 
 print("\n=== bleed resistors ===")
@@ -189,40 +183,26 @@ place("npn13G2", {"Nx": 2, "Ny": 1},  115.0, -95.0, mirror=True, label="XB2")
 print("\n=== cascode mirrors ===")
 # DC only, so distance from the tank costs nothing. Placed well below
 # everything else.
-# The tail node swings at twice the oscillation frequency and carries 2 mA,
-# so the run from the cross-coupled emitters down to the tail mirror is a real
-# inductive path, not just a wire. At MY = -295 that run was 220 um. Moving
-# the row up to -190 roughly halves it.
-#
-# Coordinates are symmetric about x = 0. An earlier floorplan shift used a
-# regex that caught x as well as y, which left XMT2/XMT1 at -55/+30 and the
-# buffer mirrors skewed. Differential asymmetry does not announce itself.
-MY = -190.0
-
-# Tail mirror, directly beneath the cross-coupled pair at x = +/-9.
-place("nmos", {"w": "70u", "l": "1u", "ng": "10", "m": "1", "guardRingType": "psub"}, -20.0, MY,
-      label="XMT2")
-place("nmos", {"w": "70u", "l": "1u", "ng": "10", "m": "1", "guardRingType": "psub"},  20.0, MY,
-      mirror=True, label="XMT1")
-
-# Reference branch, off to one side and out of the tank's way.
-place("nmos", {"w": "10u", "l": "1u", "ng": "2", "m": "1", "guardRingType": "psub"}, -55.0, MY,
+MY = -295.0
+place("nmos", {"w": "10u", "l": "1u", "ng": "2", "m": "1", "guardRingType": "psub"}, -105.0, MY,
       label="XMR2")
-place("nmos", {"w": "10u", "l": "1u", "ng": "2", "m": "1", "guardRingType": "psub"}, -42.0, MY,
+place("nmos", {"w": "10u", "l": "1u", "ng": "2", "m": "1", "guardRingType": "psub"},  -95.0, MY,
       label="XMR1")
-
-# Buffer mirrors, each pair under the buffer it feeds at x = +/-115.
-place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"}, -130.0, MY - 120,
+place("nmos", {"w": "70u", "l": "1u", "ng": "10", "m": "1", "guardRingType": "psub"},  -55.0, MY,
+      label="XMT2")
+place("nmos", {"w": "70u", "l": "1u", "ng": "10", "m": "1", "guardRingType": "psub"},   30.0, MY,
+      label="XMT1")
+place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"}, -105.0, MY - 25,
       label="XMB2A")
-place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  -95.0, MY - 120,
+place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  -60.0, MY - 25,
       label="XMB1A")
-place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},   95.0, MY - 120,
+place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},   35.0, MY - 25,
       mirror=True, label="XMB2B")
-place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  130.0, MY - 120,
+place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  105.0, MY - 25,
       mirror=True, label="XMB1B")
 
 print("\n=== reference resistor ===")
-place("rhigh", {"Calculate": "l", "R": "10k", "w": "1u"}, -75.0, MY,
+place("rhigh", {"Calculate": "l", "R": "10k", "w": "1u"}, -150.0, MY,
       label="RREF")
 
 layout.write(OUT)
