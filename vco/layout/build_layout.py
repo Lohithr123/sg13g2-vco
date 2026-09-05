@@ -114,8 +114,8 @@ except Exception as exc:
     print(f"  FAIL  inductor: {exc}")
 
 print("\n=== cross-coupled pair ===")
-place("npn13G2", {"Nx": 1, "Ny": 1}, -40.0, -100.0, label="XQ1")
-place("npn13G2", {"Nx": 1, "Ny": 1},  15.0, -100.0, mirror=True, label="XQ2")
+place("npn13G2", {"Nx": 1, "Ny": 1}, -9.0, -100.0, label="XQ1")
+place("npn13G2", {"Nx": 1, "Ny": 1},  9.0, -100.0, mirror=True, label="XQ2")
 
 print("\n=== switched capacitor bank ===")
 # Four branches stacked vertically. Each is a split capacitor pair with its
