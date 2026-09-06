@@ -526,53 +526,6 @@ if XB1 and XB2:
     print(f"  XB1 C({bc1.x:.1f},{bc1.y:.1f}) B({bb1.x:.1f},{bb1.y:.1f}) "
           f"E({be1.x:.1f},{be1.y:.1f})")
 
-
-print("\n=== buffer bias mirrors ===")
-# Each buffer emitter is pulled by its own cascode pair: XMB2 on top, XMB1
-# below. Same arrangement as the tail mirror, which routed cleanly, so the
-# same approach applies.
-#
-# These are DC nodes and the devices sit at x +/-95 and +/-130 with clear space
-# around them, so the routing is unconstrained — the only rule that matters is
-# not crossing the tank layers, which live on Metal3 and Metal4.
-
-MB2A = find("nmos", x=-130.0, y=-200.0, wmin=20)
-MB1A = find("nmos", x=-95.0, y=-200.0, wmin=20)
-MB2B = find("nmos", x=130.0, y=-200.0, wmin=20)
-MB1B = find("nmos", x=95.0, y=-200.0, wmin=20)
-for nm, o in [("XMB2A", MB2A), ("XMB1A", MB1A),
-              ("XMB2B", MB2B), ("XMB1B", MB1B)]:
-    print(f"  {nm:6} {'ok' if o else 'NOT FOUND'}")
-
-if all([MB2A, MB1A, MB2B, MB1B]) and XB1 and XB2:
-    for tag, mb2, mb1, be, sgn in (("A", MB2A, MB1A, be1, -1.0),
-                                   ("B", MB2B, MB1B, be2, 1.0)):
-        p2 = sorted(pins(mb2, 8, 2), key=lambda b: abs(b.center().x))
-        s2, d2 = p2[0], p2[-1]         # inner is source, outer is drain
-        p1 = sorted(pins(mb1, 8, 2), key=lambda b: abs(b.center().x))
-        d1 = p1[-1]
-
-        # Emitter down to the cascode drain, on Metal5.
-        # Land the lane on the drain rather than beside it: these are the
-        # same net, and a near-miss reads as a spacing violation.
-        xlane = d2.center().x
-        path("M5", [(xlane, be.y), (xlane, d2.center().y - 3.0),
-                    (d2.center().x, d2.center().y - 3.0),
-                    (d2.center().x, d2.center().y)], w=2.0)
-        drop(d2.center().x, d2.center().y, "M5", cols=1, rows=2)
-        top.shapes(LI["M5"]).insert(pya.DBox(
-            snap(d2.center().x - 0.3), snap(d2.center().y - 1.6),
-            snap(d2.center().x + 0.3), snap(d2.center().y + 1.6)))
-
-        # Cascode source to the lower device's drain, below both.
-        ylink = -207.0
-        path("M5", [(s2.center().x, s2.center().y), (s2.center().x, ylink),
-                    (d1.center().x, ylink), (d1.center().x, d1.center().y)])
-        drop(s2.center().x, s2.center().y, "M5", cols=1, rows=2)
-        drop(d1.center().x, d1.center().y, "M5", cols=1, rows=2)
-        print(f"  side {tag}: emitter -> XMB2 drain at "
-              f"({d2.center().x:.1f},{d2.center().y:.1f})")
-
 layout.write(OUT)
 print(f"\nwrote {OUT}")
 
@@ -589,13 +542,12 @@ groups = report({
     "RB1_bot": (-45.0, -164.0, "M2"), "RB2_bot": (45.0, -164.0, "M2"),
     "XB1_B": (-116.2, -96.37, "M1"), "XB2_B": (116.2, -96.37, "M1"),
     "XB1_E": (-116.2, -95.23, "M2"), "XB2_E": (116.2, -95.23, "M2"),
-    "MB2A_D": (-143.8, -200.0, "M5"), "MB2B_D": (143.8, -200.0, "M5"),
 })
 
 want = [{"XQ1_C", "XQ2_B", "CB0A_top", "CB1A_top", "CC1_top", "XB1_B"},
         {"XCV_G1", "RB1_bot"}, {"XCV_G2", "RB2_bot"},
         {"XQ2_C", "XQ1_B", "CB0B_top", "CB1B_top", "CC2_bot", "XB2_B"},
-        {"XQ1_E", "XQ2_E", "XMT2_D"}, {"XB1_E", "MB2A_D"}, {"XB2_E", "MB2B_D"}]
+        {"XQ1_E", "XQ2_E", "XMT2_D"}, {"XB1_E"}, {"XB2_E"}]
 got = [set(v) for v in groups.values()]
 print("\n--- expected grouping ---")
 for w in want:

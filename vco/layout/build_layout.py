@@ -224,13 +224,13 @@ place("nmos", {"w": "10u", "l": "1u", "ng": "2", "m": "1", "guardRingType": "psu
       label="XMR1")
 
 # Buffer mirrors, each pair under the buffer it feeds at x = +/-115.
-place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"}, -130.0, MY - 120,
+place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"}, -130.0, MY - 10,
       label="XMB2A")
-place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  -95.0, MY - 120,
+place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  -95.0, MY - 10,
       label="XMB1A")
-place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},   95.0, MY - 120,
+place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  130.0, MY - 10,
       mirror=True, label="XMB2B")
-place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},  130.0, MY - 120,
+place("nmos", {"w": "139u", "l": "1u", "ng": "20", "m": "1", "guardRingType": "psub"},   95.0, MY - 10,
       mirror=True, label="XMB1B")
 
 print("\n=== reference resistor ===")
