@@ -165,10 +165,10 @@ print("\n=== fixed tank capacitor ===")
 place("cmim", {"Calculate": "w&l", "C": "31.6f"}, 20.0, -95.0, label="CT")
 
 print("\n=== varactor and coupling ===")
-place("SVaricap", {"w": "3.74u", "l": "0.3u", "Nx": 4}, 8.0, -172.0, label="XCV")
+place("SVaricap", {"w": "3.74u", "l": "0.3u", "Nx": 4}, 0.0, -172.0, label="XCV")
 # 4 pF is 51.6 um square — the second largest object after the inductor.
-place("cmim", {"Calculate": "w&l", "C": "4p"}, -85.0, -250.0, label="CC1")
-place("cmim", {"Calculate": "w&l", "C": "4p"},  85.0, -250.0, mirror=True,
+place("cmim", {"Calculate": "w&l", "C": "4p"}, -45.0, -250.0, label="CC1")
+place("cmim", {"Calculate": "w&l", "C": "4p"},  45.0, -250.0, mirror=True,
       label="CC2")
 
 print("\n=== bias resistors ===")
