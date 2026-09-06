@@ -243,8 +243,10 @@ drop(6.0, -104.0, "M5", frm="Metal2")
 drop(d.center().x, d.center().y, "M5")
 # Emitters travel out on Metal2 (which they already use inside the device),
 # rise to Metal5 at +/-6 where the tank stacks are not, then join.
-path("M2", [(e1.x, e1.y), (e1.x, -104.0), (-6.0, -104.0)], w=0.6)
-path("M2", [(e2.x, e2.y), (e2.x, -104.0), (6.0, -104.0)], w=0.6)
+path("M2", [(e1.x, e1.y), (-8.4, e1.y), (-8.4, -104.0),
+            (-6.0, -104.0)], w=0.6)
+path("M2", [(e2.x, e2.y), (8.4, e2.y), (8.4, -104.0),
+            (6.0, -104.0)], w=0.6)
 path("M5", [(-6.0, -104.0), (6.0, -104.0)], w=1.0)
 # The tail crosses the bank region, where outp's stacks reach TopMetal1 and
 # therefore pass through Metal5. Use Metal2 down to y -145, below the bank,
