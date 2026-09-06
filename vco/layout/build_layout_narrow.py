@@ -143,29 +143,17 @@ BANK = [
     (-130.0, "20f", "16u", "4"),
 ]
 for i, (y, cval, wsw, ngsw) in enumerate(BANK):
-    # Capacitors at +/-25 rather than +/-14, and the switch offset from x = 0.
-    #
-    # The first floorplan put both bank switches on the centre line with their
-    # source and drain pins 0.35 um apart — a gap fixed by gate length and
-    # contact spacing, not by device size. The tail net also has to pass from
-    # the emitters at +/-9 down to the mirror at x -25, through the same strip.
-    # Every route into that region collided with another: nine attempts, nine
-    # different shorts.
-    #
-    # Moving the switch to x = -8 gives the tail a clear corridor at x = 0, and
-    # widening the capacitor spacing leaves room to approach each switch pin
-    # from opposite sides without the two branches converging.
-    place("cmim", {"Calculate": "w&l", "C": cval}, -25.0, y, label=f"CB{i}A")
-    place("cmim", {"Calculate": "w&l", "C": cval},  25.0, y, mirror=True,
+    place("cmim", {"Calculate": "w&l", "C": cval}, -14.0, y, label=f"CB{i}A")
+    place("cmim", {"Calculate": "w&l", "C": cval},  14.0, y, mirror=True,
           label=f"CB{i}B")
-    place("nmos", {"w": wsw, "l": "0.13u", "ng": ngsw, "m": "1",
-                   "guardRingType": "psub"}, -8.0, y, label=f"XSW{i}")
+    place("nmos", {"w": wsw, "l": "0.13u", "ng": ngsw, "m": "1", "guardRingType": "psub"}, 0.0, y,
+          label=f"XSW{i}")
 
 print("\n=== fixed tank capacitor ===")
-place("cmim", {"Calculate": "w&l", "C": "31.6f"}, 20.0, -95.0, label="CT")
+place("cmim", {"Calculate": "w&l", "C": "31.6f"}, 0.0, -95.0, label="CT")
 
 print("\n=== varactor and coupling ===")
-place("SVaricap", {"w": "3.74u", "l": "0.3u", "Nx": 4}, 8.0, -172.0, label="XCV")
+place("SVaricap", {"w": "3.74u", "l": "0.3u", "Nx": 4}, 0.0, -172.0, label="XCV")
 # 4 pF is 51.6 um square — the second largest object after the inductor.
 place("cmim", {"Calculate": "w&l", "C": "4p"}, -85.0, -250.0, label="CC1")
 place("cmim", {"Calculate": "w&l", "C": "4p"},  85.0, -250.0, mirror=True,

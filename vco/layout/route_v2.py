@@ -108,12 +108,14 @@ def drop(x, y, to, cols=2, rows=1, frm="Metal1"):
     # pad on each layer the stack passes through. The pads sit above the
     # device on layers it does not use, so they cost nothing electrically.
     order = ["M1", "M2", "M3", "M4", "M5", "TM1"]
-    start = order.index({"Metal1": "M1", "Metal2": "M2"}[frm])
+    start = order.index({"Metal1": "M1", "Metal2": "M2", "Metal3": "M3",
+                         "Metal4": "M4", "Metal5": "M5"}[frm])
     upto = order.index({v: k for k, v in STACK_NAME.items()}.get(
         STACK_NAME[to], to))
     for k in order[start + 1:upto + 1]:
+        pw, ph = (0.30, 0.125) if cols >= 2 else (0.105, 0.36 * rows / 2)
         top.shapes(LI[k]).insert(
-            pya.DBox(x - 0.36, y - 0.105, x + 0.36, y + 0.105))
+            pya.DBox(x - pw, y - ph, x + pw, y + ph))
     return bb
 
 
@@ -236,13 +238,106 @@ wire("TM1", 9.0, -85.3, 9.0, -86.0, 6.0)
 # Metal5 passes over them harmlessly and drops only at the pin.
 print("=== tail on Metal5 ===")
 d = pins(XMT2, 8, 2)[1]
-drop(e1.x, e1.y, "M5", frm="Metal2")
-drop(e2.x, e2.y, "M5", frm="Metal2")
+drop(-6.0, -104.0, "M5", frm="Metal2")
+drop(6.0, -104.0, "M5", frm="Metal2")
 drop(d.center().x, d.center().y, "M5")
-path("M5", [(e1.x, e1.y), (e1.x, -104.0),
-            (e2.x, -104.0), (e2.x, e2.y)])
-path("M5", [(0.0, -104.0), (0.0, -190.0), (d.center().x, -190.0),
+# Emitters travel out on Metal2 (which they already use inside the device),
+# rise to Metal5 at +/-6 where the tank stacks are not, then join.
+path("M2", [(e1.x, e1.y), (e1.x, -104.0), (-6.0, -104.0)], w=0.6)
+path("M2", [(e2.x, e2.y), (e2.x, -104.0), (6.0, -104.0)], w=0.6)
+path("M5", [(-6.0, -104.0), (6.0, -104.0)], w=1.0)
+# The tail crosses the bank region, where outp's stacks reach TopMetal1 and
+# therefore pass through Metal5. Use Metal2 down to y -145, below the bank,
+# then transition to Metal5 for the run to the mirror.
+path("M5", [(0.0, -104.0), (0.0, -190.0),
+            (d.center().x, -190.0),
             (d.center().x, d.center().y)], w=2.0)
+drop(d.center().x, d.center().y, "M5")
+
+
+print("\n=== bank branches ===")
+# Each branch: tank node -> capacitor -> switch -> capacitor -> other tank node.
+# The split-capacitor arrangement keeps the branch symmetric; a single-ended
+# switch would unbalance the tank.
+#
+# Layer choice matters here. The capacitor's top plate is TopMetal1 and its
+# bottom plate Metal5 — but Metal5 already carries the tail net down the centre
+# at x = 0, straight past both switches. So the tank side connects to the TOP
+# plate on TopMetal1, and the switch side leaves the BOTTOM plate on Metal5 but
+# jogs out to x = +/-6 before turning down, clear of the tail.
+#
+# The bank sits below the inductor (whose own TopMetal1 stops at y -85.3), so
+# routing on TopMetal1 down here does not touch the spiral.
+
+def cap_plates(inst):
+    """Top plate (TopMetal1) and bottom plate (Metal5) of a cmim, in top
+    coordinates."""
+    tp = [sh.dbbox().transformed(inst.dcplx_trans)
+          for sh in layout.cell(inst.cell_index).shapes(LI["TM1"]).each()]
+    bp = [sh.dbbox().transformed(inst.dcplx_trans)
+          for sh in layout.cell(inst.cell_index).shapes(LI["M5"]).each()]
+    return tp[0], bp[0]
+
+BANKY = [-108.0, -130.0]
+for i, yb in enumerate(BANKY):
+    ca = find("cmim", x=-25.0, y=yb)
+    cb = find("cmim", x=25.0, y=yb)
+    sw = find("nmos", x=-8.0, y=yb, wmin=None)
+    if not (ca and cb and sw):
+        print(f"  branch {i}: device missing, skipped")
+        continue
+    ta, ba = cap_plates(ca)
+    tb, bb_ = cap_plates(cb)
+    sp = pins(sw, 8, 2)
+    src, drn = sp[0], sp[1]
+
+    # Tank side: outp (Metal3) to CBxA top plate, outn (Metal4) to CBxB.
+    # A via stack from Metal3 up to TopMetal1 must physically pass through
+    # Metal4, and vice versa — so if outp is on Metal3 and outn on Metal4,
+    # any stack reaching a TopMetal1 plate bridges them. That was the short.
+    #
+    # The capacitor has two plates on different layers: TopMetal1 on top,
+    # Metal5 below. Give each tank net the plate nearest its own layer.
+    # outn (Metal4) reaches Metal5 with a single via and never touches Metal3.
+    # outp (Metal3) goes all the way to TopMetal1, crossing Metal4 and Metal5 —
+    # but only at CBxA, where outn has no metal, so nothing is bridged.
+    #
+    # The switch then connects to the OTHER plate of each capacitor: CBxA's
+    # bottom plate and CBxB's top plate.
+    path("M3", [(-16.0, -105.0), (-16.0, ta.center().y),
+                (ta.center().x, ta.center().y)])
+    drop(ta.center().x, ta.center().y, "TM1", frm="Metal3")
+
+    path("M4", [(16.0, -109.0), (16.0, tb.center().y),
+                (bb_.center().x, tb.center().y)])
+    drop(bb_.center().x, bb_.center().y, "M5", frm="Metal4")
+
+    # B side: tank is on the bottom plate, so the switch takes the top plate.
+    # A 1.64 um TopMetal1 pad meets TM1.a, then drop to Metal5 immediately.
+    tx = tb.center().x + 6.0
+    wire("TM1", tb.center().x, tb.center().y, tx, tb.center().y, 1.64)
+    drop(tx, tb.center().y, "TM1", frm="Metal5")
+
+    ytop = yb + 5.5
+    ybot = yb - 5.5
+    for plate, lyr, pin, ych in ((ba, "M5", src, ytop),
+                                 (pya.DBox(tx - 0.5, tb.center().y - 0.5,
+                                           tx + 0.5, tb.center().y + 0.5),
+                                  "M5", drn, ybot)):
+        px = pin.center().x
+        path(lyr, [(plate.center().x, plate.center().y),
+                   (plate.center().x, ych),
+                   (px, ych),
+                   (px, pin.center().y + (2.0 if ych > yb else -2.0))],
+             w=0.4)
+        # A Metal1->Metal5 stack here would put metal on Metal3 and Metal4,
+        # which are outp and outn — every switch pin would join both tank
+        # nets. Come down to Metal2 clear of the switch, cross on Metal2, and
+        # drop a single level onto the pin.
+        drop(px, pin.center().y, lyr, cols=1, rows=8)
+    print(f"  branch {i} at y {yb}: caps ({ta.center().x:+.1f},"
+          f"{tb.center().x:+.1f}) switch pins ({src.center().x:+.2f},"
+          f"{drn.center().x:+.2f})")
 
 layout.write(OUT)
 print(f"\nwrote {OUT}")
@@ -252,9 +347,12 @@ groups = report({
     "XQ2_C": (c2.x, c2.y, "M1"), "XQ1_B": (b1.x, b1.y, "M1"),
     "XQ1_E": (e1.x, e1.y, "M2"), "XQ2_E": (e2.x, e2.y, "M2"),
     "XMT2_D": (d.center().x, d.center().y, "M1"),
+    "CB0A_top": (-25.0, -108.0, "TM1"), "CB0B_top": (25.0, -108.0, "M5"),
+    "CB1A_top": (-25.0, -130.0, "TM1"), "CB1B_top": (25.0, -130.0, "M5"),
 })
 
-want = [{"XQ1_C", "XQ2_B"}, {"XQ2_C", "XQ1_B"},
+want = [{"XQ1_C", "XQ2_B", "CB0A_top", "CB1A_top"},
+        {"XQ2_C", "XQ1_B", "CB0B_top", "CB1B_top"},
         {"XQ1_E", "XQ2_E", "XMT2_D"}]
 got = [set(v) for v in groups.values()]
 print("\n--- expected grouping ---")
