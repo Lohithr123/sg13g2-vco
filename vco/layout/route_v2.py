@@ -607,8 +607,8 @@ if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
     casc = [XMR2, XMT2, MB2A, MB2B]
     lower = [XMR1, XMT1, MB1A, MB1B]
 
-    for tag, group, ybus in (("cascode", casc, -212.0),
-                             ("lower", lower, -218.0)):
+    for tag, group, ybus, blyr in (("cascode", casc, -212.0, "M2"),
+                                   ("lower", lower, -184.0, "M2")):
         gs = [(g, gate(g)) for g in group]
         gs = [(g, b) for g, b in gs if b is not None]
         if len(gs) < 2:
@@ -616,9 +616,9 @@ if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
             continue
         xs = sorted(b.center().x for _, b in gs)
         # Spine across the full span, then a stub down or up to each gate.
-        wire("M2", xs[0], ybus, xs[-1], ybus, 1.0)
+        wire(blyr, xs[0], ybus, xs[-1], ybus, 1.0)
         for g, b in gs:
-            drop(b.center().x, b.center().y, "M2", cols=1, rows=2)
+            drop(b.center().x, b.center().y, blyr, cols=1, rows=2)
             # Step away from the device's own source/drain pins, which sit
             # only ~0.35 um from the gate. A fixed direction cannot work: at
             # the tail mirror the drain is inboard of the gate, at the buffer
@@ -627,7 +627,7 @@ if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
             # side, so any lateral step passes over one of them. Go straight
             # down instead: Metal2 is empty below the mirrors, and the drains
             # are routed on Metal5.
-            wire("M2", b.center().x, b.center().y, b.center().x, ybus, 0.21)
+            wire(blyr, b.center().x, b.center().y, b.center().x, ybus, 0.21)
         print(f"  {tag} bus at y {ybus}: {len(gs)} gates from "
               f"x {xs[0]:.1f} to {xs[-1]:.1f}")
 
@@ -683,7 +683,7 @@ groups = report({
     "XB1_B": (-116.2, -96.37, "M1"), "XB2_B": (116.2, -96.37, "M1"),
     "XB1_E": (-116.2, -95.23, "M2"), "XB2_E": (116.2, -95.23, "M2"),
     "MB2A_D": (-143.8, -200.0, "M5"), "MB2B_D": (143.8, -200.0, "M5"),
-    "casc_bus": (-30.0, -212.0, "M2"), "lower_bus": (-30.0, -218.0, "M2"),
+    "casc_bus": (-30.0, -212.0, "M2"), "lower_bus": (-30.0, -184.0, "M2"),
     "nb0": (-38.0, -143.0, "M2"), "nb1": (-33.0, -143.0, "M2"),
 })
 
