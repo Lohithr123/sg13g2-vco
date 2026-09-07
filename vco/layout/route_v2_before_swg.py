@@ -631,41 +631,6 @@ if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
         print(f"  {tag} bus at y {ybus}: {len(gs)} gates from "
               f"x {xs[0]:.1f} to {xs[-1]:.1f}")
 
-
-print("\n=== bank switch gates ===")
-# Two control inputs, one per bank bit. These select the band, so they are
-# static logic levels — no signal, no timing constraint, and the only thing
-# that matters is not disturbing the tank.
-#
-# The switches sit at x -8 with their gate between source and drain, 0.35 um
-# either side. Same geometry as the mirror gates, so the same approach: a via
-# straight up on the gate, then a stub on a layer nothing else uses here.
-# Metal2 carries the mirror gate buses but only below y -200; up here at
-# y -108 and -130 it is free.
-
-for i, yb in enumerate(BANKY):
-    sw = find("nmos", x=-8.0, y=yb, wmin=None)
-    if not sw:
-        print(f"  bit {i}: switch not found")
-        continue
-    gp = pins(sw, 5, 2)
-    if not gp:
-        print(f"  bit {i}: no gate pin")
-        continue
-    g = gp[0]
-    # Out to the left edge, clear of the bank capacitors at x -25 and the
-    # tail's Metal5 lane at x 0.
-    # Contact the gate below the active area, where the poly extends past the
-    # source and drain pins and nothing sits either side of it.
-    gy = g.bottom - 0.05
-    drop(g.center().x, gy - 0.25, "M2", cols=1, rows=2)
-    path("M2", [(g.center().x, gy - 0.25),
-                (g.center().x, yb - 8.0),
-                (-38.0 + 5.0 * i, yb - 8.0),
-                (-38.0 + 5.0 * i, -145.0)], w=0.4)
-    print(f"  bit {i}: gate at ({g.center().x:.2f},{g.center().y:.2f}) "
-          f"out to x -60")
-
 layout.write(OUT)
 print(f"\nwrote {OUT}")
 
@@ -684,14 +649,12 @@ groups = report({
     "XB1_E": (-116.2, -95.23, "M2"), "XB2_E": (116.2, -95.23, "M2"),
     "MB2A_D": (-143.8, -200.0, "M5"), "MB2B_D": (143.8, -200.0, "M5"),
     "casc_bus": (-30.0, -212.0, "M2"), "lower_bus": (-30.0, -218.0, "M2"),
-    "nb0": (-38.0, -143.0, "M2"), "nb1": (-33.0, -143.0, "M2"),
 })
 
 want = [{"XQ1_C", "XQ2_B", "CB0A_top", "CB1A_top", "CC1_top", "XB1_B"},
         {"XCV_G1", "RB1_bot"}, {"XCV_G2", "RB2_bot"},
         {"XQ2_C", "XQ1_B", "CB0B_top", "CB1B_top", "CC2_bot", "XB2_B"},
-        {"XQ1_E", "XQ2_E", "XMT2_D"}, {"XB1_E", "MB2A_D"}, {"XB2_E", "MB2B_D"},
-        {"nb0"}, {"nb1"}]
+        {"XQ1_E", "XQ2_E", "XMT2_D"}, {"XB1_E", "MB2A_D"}, {"XB2_E", "MB2B_D"}]
 got = [set(v) for v in groups.values()]
 print("\n--- expected grouping ---")
 for w in want:
