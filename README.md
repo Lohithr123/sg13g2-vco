@@ -15,7 +15,7 @@ laptop.
 | Output | −2.4 to −3.0 dBm differential into 50 Ω |
 | Supply | 3.3 V; 6.6 mW core, 33 mW including buffers |
 | Tank | 0.901 nH, Q 9.68 at 20 GHz, EM-extracted |
-| Layout | 29 devices, 300 × 433 µm, DRC clean |
+| Layout | 29 devices, 300 × 433 µm, DRC clean, 11 nets routed |
 | FoM | −181.6 dBc/Hz |
 
 Every figure comes from simulation of components characterised in this
@@ -419,9 +419,18 @@ manufacturable and DRC clean, but their values come from the 1.5 fF/µm² area
 coefficient rather than the full model, so the parasitic terms are not
 guaranteed.
 
-**The layout is placed but not routed.** No LVS match, no parasitic
-extraction. Extracted parasitics would land on the tank and shift the band
-plan, requiring the fixed capacitor to be re-trimmed and the corners re-run.
+**The layout is routed but not LVS-matched.** All eleven nets are DRC clean
+and verified by extracting the layout and checking which terminals share a net,
+but that is a check against my own expectation of the circuit, not against the
+netlist. A full LVS run would compare the two properly. There is no parasitic
+extraction either, and extracted parasitics would land on the tank and shift
+the band plan, requiring the fixed capacitor to be re-trimmed and the corners
+re-run.
+
+**Two guard rings have no metal tie to the ground rail.** The bank switches sit
+between the band-select lines and the tail with no free side. Their psub rings
+still tie them to the substrate, which is what the latch-up rules check, but a
+production layout would place them where ground can reach.
 
 **Phase noise was measured at one band code only**, and only on the 4-bit
 design. Tank Q differs across the bank, so the figure will vary.
