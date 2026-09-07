@@ -283,30 +283,31 @@ dominated by spectral leakage, not oscillator noise.
 Scripted rather than drawn. The tank is differential, and any mismatch between
 the two sides becomes oscillator imbalance directly — hand-placing mirrored
 devices is exactly where that error creeps in. Every differential pair is
-placed as a computed reflection about x = 0.
+placed as a computed reflection about x = 0, and every net is checked by
+extracting the layout and comparing which terminals share a net against what
+the circuit requires.
 
-**29 devices, 300 × 433 µm, DRC clean.**
+**29 devices, 300 × 433 µm, DRC clean, 11 nets routed and verified.**
 
 ### Two constraints that only appeared at layout
 
 **The inductor's footprint is ±85.3 µm, not the ±55 its 110.59 µm spiral
 diameter suggests.** The NoRCX blanket and fill-blocking layers extend well
-past the coil. Devices placed inside that footprint trip latch-up rules
-(LU.a) and contact rules (CntB.h1). The whole floorplan moved down 25 µm.
+past the coil. Devices placed inside that footprint trip latch-up rules (LU.a)
+and contact rules (CntB.h1). The whole floorplan moved down 25 µm.
 
-**The smallest DRC-clean MIM capacitor is 10 fF.** Below that the TopMetal1
-top plate falls under minimum width (TM1.a). The PCell will build down to
-1.14 µm — matching the DRC area rule — but the metal it draws at those sizes
-is illegal.
+**The smallest DRC-clean MIM capacitor is 10 fF.** Below that the TopMetal1 top
+plate falls under minimum width (TM1.a). The PCell will build down to 1.14 µm —
+matching the DRC area rule — but the metal it draws at those sizes is illegal.
 
 The designed 4-bit bank needed 4.16 and 8.32 fF capacitors. Two of four bits
 were unbuildable.
 
 ### The bank redesign
 
-The split-capacitor topology softened the blow: two capacitors in series
-either side of the switch means a 10 fF pair gives a 5 fF branch. The bank
-became 2-bit with a 5 fF LSB.
+The split-capacitor topology softened the blow: two capacitors in series either
+side of the switch means a 10 fF pair gives a 5 fF branch. The bank became
+2-bit with a 5 fF LSB.
 
 | | designed | buildable |
 |---|---|---|
@@ -325,10 +326,76 @@ Re-simulated to confirm the bands still overlap:
 | 2 | 20.293 | 19.379 | +497 MHz |
 | 3 | 19.876 | 19.014 | — |
 
-Continuous, with roughly half a band of margin. The Nx=4 varactor is in fact
-larger than needed; a smaller one would load the tank less.
+Continuous, with roughly half a band of margin.
 
----
+### Routing: one net per layer
+
+The first routing attempt drew each net as a path from A to B without checking
+what already occupied that space. Every net broke differently — routes abutting
+instead of overlapping, vias landing on terminals that were already contacted,
+horizontal runs cutting through a mirror's finger array and shorting eleven
+diffusion strips together. **DRC passed on all of them.** Only extracting the
+netlist and comparing terminal groupings found the faults.
+
+What worked was assigning each net its own layer, because the devices occupy
+only Metal1 and below while Metal3, Metal4 and Metal5 are empty:
+
+| layer | carries |
+|---|---|
+| Metal2 | mirror gate buses, band-select lines |
+| Metal3 | `outp` |
+| Metal4 | `outn` |
+| Metal5 | tail, buffer bias |
+| TopMetal1 | ground |
+| TopMetal2 | Vcc |
+
+Two nets that must cross are then on different layers, and crossing is free.
+
+### Three things that cost hours
+
+**Terminal pitch.** The npn13G2's collector, emitter and base sit 1.14 µm apart
+with the emitter's own Metal2 spanning the gap between them, and each terminal
+is only 0.24 µm tall. Nothing can be routed laterally at that pitch: a 1 µm
+wire is four times taller than the terminal it starts from. Via stacks have to
+land *on* the terminal and rise immediately.
+
+**Via stacks cross every layer in between.** A stack from Metal3 to TopMetal1
+passes through Metal4 — so with `outp` on Metal3 and `outn` on Metal4, every
+stack reaching a capacitor's top plate bridged the two tank nets. The fix was
+giving each net a different plate of the same capacitor: `outp` takes the
+TopMetal1 top plate, `outn` the Metal5 bottom plate.
+
+**Mirroring reverses things silently.** `DTrans(M90, dx, dy)` mirrors before it
+translates, so every mirrored device with an off-centre bounding box landed at
+`x − 2·cx` instead of `x`. The bipolars happened to be symmetric and looked
+fine, which is why it hid — but the capacitors, resistors and mirrors were all
+displaced, and the differential symmetry the layout exists to preserve was
+quietly broken. The same class of error put one buffer's cascode inboard and
+the other's outboard.
+
+### Power routing is a floorplan constraint
+
+Ground touches ten scattered points — four mirror sources and six guard rings —
+and it was the hardest net by a distance. Four attempts each freed one net and
+caught another: the tail, then the band-select lines, then the cascode bus,
+then Vcc itself.
+
+The resolution was to stop choosing one layer for the whole net and instead
+check which layer is free in each *column*. TopMetal1 turned out to be clear at
+x −8, ±95 and ±130 all the way down, because its only occupants are the
+capacitor plates at x ±19..71 and the inductor above y −85. Points in those
+columns drop straight to a rail at y −300; the four sitting behind a coupling
+capacitor step out first along y −215, in the 19 µm gap between the mirror row
+and the caps.
+
+**Two guard rings could not be reached.** The bank switches are 3.4 µm wide
+with the band-select lines immediately left and the tail's Metal5 immediately
+right — boxed in on both sides. Their psub rings still tie those devices to the
+substrate, which is what satisfies the latch-up rules, but they have no
+explicit metal path to the ground rail. That is a floorplan consequence, not a
+routing one: a design intending to route power reserves a channel for it from
+the start, or places grounded devices along a common edge. Ours did neither,
+because the floorplan was laid out to avoid device overlaps and nothing else.
 
 ## 5. Limitations
 
