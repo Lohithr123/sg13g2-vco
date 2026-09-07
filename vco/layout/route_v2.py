@@ -658,8 +658,8 @@ for i, yb in enumerate(BANKY):
     # Contact the gate below the active area, where the poly extends past the
     # source and drain pins and nothing sits either side of it.
     gy = g.bottom - 0.05
-    drop(g.center().x, gy - 0.25, "M2", cols=1, rows=2)
-    path("M2", [(g.center().x, gy - 0.25),
+    drop(g.center().x, gy - 0.45, "M2", cols=1, rows=2)
+    path("M2", [(g.center().x, gy - 0.45),
                 (g.center().x, yb - 8.0),
                 (-38.0 + 5.0 * i, yb - 8.0),
                 (-38.0 + 5.0 * i, -145.0)], w=0.4)
