@@ -547,17 +547,17 @@ for nm, o in [("XMB2A", MB2A), ("XMB1A", MB1A),
 if all([MB2A, MB1A, MB2B, MB1B]) and XB1 and XB2:
     for tag, mb2, mb1, be, sgn in (("A", MB2A, MB1A, be1, -1.0),
                                    ("B", MB2B, MB1B, be2, 1.0)):
-        p2 = pins(mb2, 8, 2)           # cell-frame order: source, then drain
-        s2, d2 = p2[0], p2[1]
-        d1 = pins(mb1, 8, 2)[1]
+        p2 = sorted(pins(mb2, 8, 2), key=lambda b: abs(b.center().x))
+        s2, d2 = p2[0], p2[-1]         # inner is source, outer is drain
+        p1 = sorted(pins(mb1, 8, 2), key=lambda b: abs(b.center().x))
+        d1 = p1[-1]
 
         # Emitter down to the cascode drain, on Metal5.
         # Land the lane on the drain rather than beside it: these are the
         # same net, and a near-miss reads as a spacing violation.
         xlane = d2.center().x
-        xapp = d2.center().x + (6.0 if d2.center().x < 0 else -6.0)
-        path("M5", [(xapp, be.y), (xapp, d2.center().y - 4.0),
-                    (d2.center().x, d2.center().y - 4.0),
+        path("M5", [(xlane, be.y), (xlane, d2.center().y - 3.0),
+                    (d2.center().x, d2.center().y - 3.0),
                     (d2.center().x, d2.center().y)], w=2.0)
         drop(d2.center().x, d2.center().y, "M5", cols=1, rows=2)
         top.shapes(LI["M5"]).insert(pya.DBox(
@@ -572,64 +572,6 @@ if all([MB2A, MB1A, MB2B, MB1B]) and XB1 and XB2:
         drop(d1.center().x, d1.center().y, "M5", cols=1, rows=2)
         print(f"  side {tag}: emitter -> XMB2 drain at "
               f"({d2.center().x:.1f},{d2.center().y:.1f})")
-
-
-print("\n=== mirror gate buses ===")
-# One reference branch biases every mirror in the design: XMR2's gate drives
-# all the cascode gates, XMR1's drives all the lower gates. Six devices on two
-# buses.
-#
-# Poly is resistive, so each gate gets a via up to Metal5 immediately and the
-# run happens there. These are DC nodes with no signal on them, but they still
-# must not cross Metal3 or Metal4 — those carry the tank.
-#
-# The two buses run at different y so they never meet: cascodes at y -215,
-# lower gates at y -220, both below the mirror row at -190 and above the
-# buffer mirrors at -200... which they are not. Use -172 and -178 instead,
-# in the gap between the varactor row and the mirror row.
-
-XMR2 = find("nmos", x=-55.0, y=-190.0)
-XMR1 = find("nmos", x=-42.0, y=-190.0)
-for nm, o in [("XMR2", XMR2), ("XMR1", XMR1)]:
-    print(f"  {nm:6} {'ok' if o else 'NOT FOUND'}")
-
-if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
-    def gate(inst):
-        g = pins(inst, 5, 2)
-        return g[0] if g else None
-
-    casc = [XMR2, XMT2, XMT1, MB2A, MB2B]      # upper devices
-    lower = [XMR1, XMT1, XMT2, MB1A, MB1B]     # lower devices
-
-    # The tail cascode pair is XMT2 over XMT1, and the buffer pairs XMB2 over
-    # XMB1, so the cascode bus takes XMT2/MB2A/MB2B and the lower bus takes
-    # XMT1/MB1A/MB1B.
-    casc = [XMR2, XMT2, MB2A, MB2B]
-    lower = [XMR1, XMT1, MB1A, MB1B]
-
-    for tag, group, ybus in (("cascode", casc, -212.0),
-                             ("lower", lower, -218.0)):
-        gs = [(g, gate(g)) for g in group]
-        gs = [(g, b) for g, b in gs if b is not None]
-        if len(gs) < 2:
-            print(f"  {tag} bus: too few gates found, skipped")
-            continue
-        xs = sorted(b.center().x for _, b in gs)
-        # Spine across the full span, then a stub down or up to each gate.
-        wire("M2", xs[0], ybus, xs[-1], ybus, 1.0)
-        for g, b in gs:
-            drop(b.center().x, b.center().y, "M2", cols=1, rows=2)
-            # Step away from the device's own source/drain pins, which sit
-            # only ~0.35 um from the gate. A fixed direction cannot work: at
-            # the tail mirror the drain is inboard of the gate, at the buffer
-            # mirrors the emitter lane is outboard.
-            # The gate sits between source and drain with only 0.7 um either
-            # side, so any lateral step passes over one of them. Go straight
-            # down instead: Metal2 is empty below the mirrors, and the drains
-            # are routed on Metal5.
-            wire("M2", b.center().x, b.center().y, b.center().x, ybus, 0.21)
-        print(f"  {tag} bus at y {ybus}: {len(gs)} gates from "
-              f"x {xs[0]:.1f} to {xs[-1]:.1f}")
 
 layout.write(OUT)
 print(f"\nwrote {OUT}")
@@ -648,7 +590,6 @@ groups = report({
     "XB1_B": (-116.2, -96.37, "M1"), "XB2_B": (116.2, -96.37, "M1"),
     "XB1_E": (-116.2, -95.23, "M2"), "XB2_E": (116.2, -95.23, "M2"),
     "MB2A_D": (-143.8, -200.0, "M5"), "MB2B_D": (143.8, -200.0, "M5"),
-    "casc_bus": (-30.0, -212.0, "M2"), "lower_bus": (-30.0, -218.0, "M2"),
 })
 
 want = [{"XQ1_C", "XQ2_B", "CB0A_top", "CB1A_top", "CC1_top", "XB1_B"},
