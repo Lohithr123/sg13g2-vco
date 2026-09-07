@@ -117,7 +117,7 @@ def drop(x, y, to, cols=2, rows=1, frm="Metal1"):
     # (M2.d, M3.d, M4.d are minimum-AREA rules, not spacing). Add a landing
     # pad on each layer the stack passes through. The pads sit above the
     # device on layers it does not use, so they cost nothing electrically.
-    order = ["M1", "M2", "M3", "M4", "M5", "TM1", "TM2"]
+    order = ["M1", "M2", "M3", "M4", "M5", "TM1"]
     start = order.index({"Metal1": "M1", "Metal2": "M2", "Metal3": "M3",
                          "Metal4": "M4", "Metal5": "M5"}[frm])
     upto = order.index({v: k for k, v in STACK_NAME.items()}.get(
@@ -175,17 +175,17 @@ def pins(inst, lay, dt):
 
 def extract():
     l2n = pya.LayoutToNetlist(pya.RecursiveShapeIterator(layout, top, []))
-    for k in ("M1", "M2", "M3", "M4", "M5", "TM1", "TM2"):
+    for k in ("M1", "M2", "M3", "M4", "M5", "TM1"):
         l2n.register(pya.Region(top.begin_shapes_rec(LI[k])), k)
     for v, (a, b) in [(19, ("M1", "M2")), (29, ("M2", "M3")),
                       (49, ("M3", "M4")), (66, ("M4", "M5")),
-                      (125, ("M5", "TM1")), (133, ("TM1", "TM2"))]:
+                      (125, ("M5", "TM1"))]:
         nm = f"V{v}"
         l2n.register(pya.Region(top.begin_shapes_rec(layout.layer(v, 0))), nm)
         l2n.connect(l2n.layer_by_name(nm))
         l2n.connect(l2n.layer_by_name(a), l2n.layer_by_name(nm))
         l2n.connect(l2n.layer_by_name(nm), l2n.layer_by_name(b))
-    for k in ("M1", "M2", "M3", "M4", "M5", "TM1", "TM2"):
+    for k in ("M1", "M2", "M3", "M4", "M5", "TM1"):
         l2n.connect(l2n.layer_by_name(k))
     l2n.extract_netlist()
     return l2n
@@ -666,58 +666,6 @@ for i, yb in enumerate(BANKY):
     print(f"  bit {i}: gate at ({g.center().x:.2f},{g.center().y:.2f}) "
           f"out to x -60")
 
-
-print("\n=== supply and ground ===")
-# Vcc reaches the inductor centre tap, both buffer collectors and RREF.
-# Ground reaches every mirror source, every guard ring and the bleed resistors.
-#
-# Layer choice, given what is already taken: Metal3 is outp, Metal4 is outn,
-# Metal2 carries both gate buses and the band-select lines, Metal5 has the tail
-# and the buffer bias. TopMetal2 is used only by the inductor's own centre tap
-# at x +/-3, so it is effectively free — and it is the thickest metal, which is
-# what a supply rail wants anyway.
-#
-# Vcc on TopMetal2, ground on TopMetal1 outside the inductor's footprint.
-# TopMetal1 minimum width is 1.64 um, so both rails are drawn at 4 um.
-
-VCC_Y = -60.0        # above the devices, below the inductor's -85.3 edge... it
-                     # is not: the inductor spans to -85.3, so the rail must be
-                     # clear of that. Use -160, in the gap between the varactor
-                     # row and the mirror row.
-VCC_Y = -160.0
-GND_Y = -240.0       # below the mirror rows, above the coupling caps at -224
-GND_Y = -300.0       # ...which they are not; -300 is below everything
-
-RREF = find("rhigh", x=-75.0, y=-190.0)
-print(f"  RREF   {'ok' if RREF else 'NOT FOUND'}")
-
-# --- Vcc rail ---
-wire("TM2", -150.0, VCC_Y, 150.0, VCC_Y, 4.0)
-
-# Inductor centre tap LC is TopMetal2 at x -3..3, y -85.3..-82.3. Bring it down
-# on TopMetal2 -- same layer, so no via needed.
-wire("TM2", 0.0, -85.3, 0.0, VCC_Y, 4.0)
-
-# Buffer collectors.
-if XB1 and XB2:
-    for bc in (bc1, bc2):
-        drop(bc.x, bc.y, "TM2")
-        xside = -150.0 if bc.x < 0 else 150.0
-        path("TM2", [(bc.x, bc.y), (xside, bc.y), (xside, VCC_Y)], w=4.0)
-    print(f"  Vcc rail at y {VCC_Y}, collectors at "
-          f"({bc1.x:.0f},{bc1.y:.0f}) and ({bc2.x:.0f},{bc2.y:.0f})")
-
-# RREF's top end.
-if RREF:
-    rr = sorted(pins(RREF, 8, 2), key=lambda b: b.center().y)
-    drop(rr[-1].center().x, rr[-1].center().y, "TM2")
-    path("TM2", [(rr[-1].center().x, rr[-1].center().y),
-                 (rr[-1].center().x, VCC_Y)], w=4.0)
-
-# --- ground rail ---
-wire("TM1", -150.0, GND_Y, 150.0, GND_Y, 4.0)
-print(f"  ground rail at y {GND_Y}")
-
 layout.write(OUT)
 print(f"\nwrote {OUT}")
 
@@ -737,14 +685,13 @@ groups = report({
     "MB2A_D": (-143.8, -200.0, "M5"), "MB2B_D": (143.8, -200.0, "M5"),
     "casc_bus": (-30.0, -212.0, "M2"), "lower_bus": (-30.0, -184.0, "M2"),
     "nb0": (-38.0, -143.0, "M2"), "nb1": (-33.0, -143.0, "M2"),
-    "vcc": (0.0, -160.0, "TM2"), "gnd": (0.0, -300.0, "TM1"),
 })
 
 want = [{"XQ1_C", "XQ2_B", "CB0A_top", "CB1A_top", "CC1_top", "XB1_B"},
         {"XCV_G1", "RB1_bot"}, {"XCV_G2", "RB2_bot"},
         {"XQ2_C", "XQ1_B", "CB0B_top", "CB1B_top", "CC2_bot", "XB2_B"},
         {"XQ1_E", "XQ2_E", "XMT2_D"}, {"XB1_E", "MB2A_D"}, {"XB2_E", "MB2B_D"},
-        {"nb0"}, {"nb1"}, {"vcc"}, {"gnd"}]
+        {"nb0"}, {"nb1"}]
 got = [set(v) for v in groups.values()]
 print("\n--- expected grouping ---")
 for w in want:
