@@ -397,6 +397,72 @@ routing one: a design intending to route power reserves a channel for it from
 the start, or places grounded devices along a common edge. Ours did neither,
 because the floorplan was laid out to avoid device overlaps and nothing else.
 
+### What LVS found
+
+The layout above is DRC clean and every net was verified by extracting the
+netlist and checking which terminals share a net. Both checks pass. Neither is
+LVS.
+
+Running LVS properly — comparing the extracted netlist against the schematic
+netlist rather than against my own expectation of it — found something the
+other two could not:
+
+**Every multi-finger transistor was uncommoned.** The nmos PCell draws each
+finger separately and does not connect them. A `w=139u ng=20` device is drawn
+as twenty diffusion strips and twenty poly gates, and joining them is the
+layout's job, not the PCell's. My router contacted one drain strip, one source
+strip and one gate, and left the other nineteen of each floating.
+
+So the four buffer current mirrors, both tail devices, both reference devices
+and both bank switches — ten devices — extracted as chains of separate
+transistors in series with unconnected gates:
+
+```
+M$1  $23 $111 $23 $1  sg13_lv_nmos L=1u W=6.95u
+M$2  $23 $113 $24 $1  sg13_lv_nmos L=1u W=6.95u
+M$3  $24 $114 $25 $1  sg13_lv_nmos L=1u W=6.95u
+...
+```
+
+Sixty-six transistors where there should be ten. The circuit could not have
+worked.
+
+**Why the earlier checks missed it.** DRC asks whether the shapes obey the
+width and spacing rules; twenty separate fingers obey them perfectly. My
+connectivity check probed one terminal per device and compared groupings — and
+the one terminal it probed was correctly connected, because that is the one the
+router had wired. Both checks were answering a narrower question than they
+appeared to.
+
+**The fix** is a comb: extend alternate diffusion strips past the array and bus
+them, drains one way and sources the other, with a poly contact for the gates.
+`add_combs.py` in this repo does that, and extraction then reports the right
+devices:
+
+```
+M$1   $20 $31 $20 $1  sg13_lv_nmos L=1u W=139u
+M$85  $20 $51 $43 $1  sg13_lv_nmos L=1u W=70u
+M$81  $20 $49 $34 $1  sg13_lv_nmos L=1u W=10u
+```
+
+**What blocks integrating it.** The gap between the diffusion strips and the
+guard ring is 0.88 µm. A 0.3 µm bus with the required 0.21 µm clearance either
+side needs 0.72 µm of that, which fits — but the terminal connections drawn
+earlier in the flow also live in that gap, because they were routed on the
+assumption that a single strip was the terminal. The gap holds the bus or the
+terminal routing, not both.
+
+Making both fit means reworking how every device terminal is contacted:
+routing from the bus rather than from a strip, across the bank, the tail, the
+buffer bias and the gate buses. That is a floorplan decision made too late —
+the same lesson as the ground routing, arriving in a different form. A layout
+that intends to bus its fingers leaves room for the bus before it starts
+routing.
+
+The committed layout is therefore DRC clean with correct net connectivity, and
+not LVS clean. The finger commoning is written and demonstrably produces the
+right devices; integrating it is the next piece of work.
+
 ## 5. Limitations
 
 Stated plainly, because they bound what the numbers mean.
