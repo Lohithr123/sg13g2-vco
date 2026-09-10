@@ -53,7 +53,7 @@ top = layout.top_cell()
 LAY = {"M1": (8, 0), "M2": (10, 0), "M3": (30, 0), "M4": (50, 0),
        "M5": (67, 0), "TM1": (126, 0), "TM2": (134, 0), "poly": (5, 0)}
 LI = {k: layout.layer(*v) for k, v in LAY.items()}
-STACK_NAME = {"GatPoly": "GatPoly", "M2": "Metal2", "M3": "Metal3", "M4": "Metal4",
+STACK_NAME = {"M2": "Metal2", "M3": "Metal3", "M4": "Metal4",
               "M5": "Metal5", "TM1": "TopMetal1", "TM2": "TopMetal2"}
 
 
@@ -118,9 +118,8 @@ def drop(x, y, to, cols=2, rows=1, frm="Metal1"):
     # pad on each layer the stack passes through. The pads sit above the
     # device on layers it does not use, so they cost nothing electrically.
     order = ["M1", "M2", "M3", "M4", "M5", "TM1", "TM2"]
-    start = order.index({"Metal1": "M1", "GatPoly": "M1", "Metal2": "M2",
-                         "Metal3": "M3", "Metal4": "M4",
-                         "Metal5": "M5"}[frm])
+    start = order.index({"Metal1": "M1", "Metal2": "M2", "Metal3": "M3",
+                         "Metal4": "M4", "Metal5": "M5"}[frm])
     upto = order.index({v: k for k, v in STACK_NAME.items()}.get(
         STACK_NAME[to], to))
     for k in order[start + 1:upto + 1]:
@@ -779,116 +778,6 @@ for nm, gx, gy in gnd_pts:
     print(f"  {nm:12} ({gx:7.1f},{gy:7.1f})  {route}")
 
 print(f"  {len(gnd_pts)} points on the rail at y {GND_Y:.0f}")
-
-
-def bus_fingers(inst, tag=""):
-    """Common a multi-finger MOSFET's fingers, inside the device.
-
-    ROOT CAUSE OF THE EARLIER FAILURES
-    ----------------------------------
-    The nmos PCell draws each finger separately and does not connect them, so
-    a w=139u ng=20 device extracts as twenty transistors in series with twenty
-    floating gates. DRC passes it; a connectivity check that probes one
-    terminal per device passes it too.
-
-    Every previous attempt at a fix put the buses BEYOND the strip ends, in
-    the 0.88 um gap between the diffusion and the guard ring. That gap is
-    already occupied by the terminal routing, so the two competed for the same
-    space and each attempt traded one broken net for another.
-
-    But the strips are 7 um tall and almost entirely unused. The room is
-    inside the device, not beyond it.
-
-    The reason the first attempt at that failed — 192 DRC violations — was not
-    the location but the via: a via stack is 0.29 um at its narrowest and a
-    diffusion strip is 0.16 um wide, so every via overhung onto the poly and
-    the neighbouring contacts.
-
-    So: widen each strip locally with a small Metal1 pad, put the via on the
-    pad, and bus on Metal2 over the array. Strip pitch is 1.38 um and adjacent
-    strips carry opposite nets whose pads sit at different heights, so the
-    clearance is comfortable. The 0.88 um gap is never touched, and the
-    existing terminal routing keeps working untouched: it lands on one strip,
-    and that strip is now bussed to the rest.
-    """
-    cell = layout.cell(inst.cell_index)
-
-    strips = []
-    for sh in cell.shapes(LI["M1"]).each():
-        b = sh.dbbox()
-        if b.width() < 0.25 and b.height() > 2.0:
-            strips.append(b.transformed(inst.dcplx_trans))
-    strips.sort(key=lambda b: b.center().x)
-    if len(strips) < 3:
-        return None
-
-    gates = sorted(
-        (sh.dbbox().transformed(inst.dcplx_trans)
-         for sh in cell.shapes(LI["poly"]).each()),
-        key=lambda b: b.center().x)
-
-    src, drn = strips[0::2], strips[1::2]
-    y0, h = strips[0].bottom, strips[0].height()
-
-    # Three levels inside the strip span, evenly spread.
-    y_s = snap(y0 + 0.12 * h)
-    y_d = snap(y0 + 0.62 * h)
-    y_g = snap(y0 + 0.80 * h)
-
-    PAD = 0.20          # half-width: via 0.19 + 0.105 enclosure
-
-    for group, ylev in ((src, y_s), (drn, y_d)):
-        _v1 = pya.Region(top.begin_shapes_rec(layout.layer(19, 0)))
-        for b in group:
-            x = b.center().x
-            _foot = pya.Region(pya.DBox(x - PAD, ylev - PAD,
-                                        x + PAD, ylev + PAD).to_itype(layout.dbu))
-            if not (_v1 & _foot).is_empty():
-                continue          # already contacted by the terminal routing
-            for lyr in ("M1", "M2"):
-                top.shapes(LI[lyr]).insert(pya.DBox(
-                    snap(x - PAD), snap(ylev - PAD),
-                    snap(x + PAD), snap(ylev + PAD)))
-            top.shapes(layout.layer(19, 0)).insert(pya.DBox(
-                snap(x - 0.095), snap(ylev - 0.095),
-                snap(x + 0.095), snap(ylev + 0.095)))
-        if len(group) > 1:
-            wire("M2", group[0].center().x, ylev,
-                 group[-1].center().x, ylev, 0.4)
-
-    # Gates need no contact at all.
-    #
-    # A contact is 0.16 um wide. The bank switches use l=0.13u, so their gate
-    # poly is narrower than the contact that would sit on it — 72 Cnt.b
-    # violations. And on the mirrors the contact was landing on poly over the
-    # active area, which is not allowed anywhere.
-    #
-    # But poly is conductive. The gates already extend 0.18 um past the
-    # diffusion at each end, so a poly bar across that overhang commons them
-    # directly. And because the existing gate routing connects to the first
-    # gate, bussing them on poly drives all of them with nothing added.
-    if len(gates) > 1:
-        gy0 = strips[0].top + 0.075     # Gat.d: 0.07 um clear of Activ
-        gy1 = gy0 + 0.16                # Gat.a: 0.13 um minimum poly width
-        if gy1 > gy0 + 0.05:
-            top.shapes(LI["poly"]).insert(pya.DBox(
-                snap(gates[0].left), snap(gy0),
-                snap(gates[-1].right), snap(gy1)))
-
-    print(f"  {tag:8} {len(src)}s + {len(drn)}d strips, {len(gates)} gates "
-          f"bussed at y {y_s:.1f} / {y_d:.1f} / {y_g:.1f}")
-    return True
-
-
-print("\n=== commoning multi-finger devices ===")
-for _t, _d in (("XSW0", find("nmos", x=-8.0, y=-108.0)),
-               ("XSW1", find("nmos", x=-8.0, y=-130.0)),
-               ("XMR2", XMR2), ("XMR1", XMR1),
-               ("XMT2", XMT2), ("XMT1", XMT1),
-               ("XMB2A", MB2A), ("XMB1A", MB1A),
-               ("XMB2B", MB2B), ("XMB1B", MB1B)):
-    if _d:
-        bus_fingers(_d, tag=_t)
 
 layout.write(OUT)
 print(f"\nwrote {OUT}")
