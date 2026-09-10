@@ -53,7 +53,7 @@ top = layout.top_cell()
 LAY = {"M1": (8, 0), "M2": (10, 0), "M3": (30, 0), "M4": (50, 0),
        "M5": (67, 0), "TM1": (126, 0), "TM2": (134, 0), "poly": (5, 0)}
 LI = {k: layout.layer(*v) for k, v in LAY.items()}
-STACK_NAME = {"GatPoly": "GatPoly", "M2": "Metal2", "M3": "Metal3", "M4": "Metal4",
+STACK_NAME = {"M2": "Metal2", "M3": "Metal3", "M4": "Metal4",
               "M5": "Metal5", "TM1": "TopMetal1", "TM2": "TopMetal2"}
 
 
@@ -118,9 +118,8 @@ def drop(x, y, to, cols=2, rows=1, frm="Metal1"):
     # pad on each layer the stack passes through. The pads sit above the
     # device on layers it does not use, so they cost nothing electrically.
     order = ["M1", "M2", "M3", "M4", "M5", "TM1", "TM2"]
-    start = order.index({"Metal1": "M1", "GatPoly": "M1", "Metal2": "M2",
-                         "Metal3": "M3", "Metal4": "M4",
-                         "Metal5": "M5"}[frm])
+    start = order.index({"Metal1": "M1", "Metal2": "M2", "Metal3": "M3",
+                         "Metal4": "M4", "Metal5": "M5"}[frm])
     upto = order.index({v: k for k, v in STACK_NAME.items()}.get(
         STACK_NAME[to], to))
     for k in order[start + 1:upto + 1]:
@@ -779,74 +778,6 @@ for nm, gx, gy in gnd_pts:
     print(f"  {nm:12} ({gx:7.1f},{gy:7.1f})  {route}")
 
 print(f"  {len(gnd_pts)} points on the rail at y {GND_Y:.0f}")
-
-
-def bus_fingers(inst, y_src=1.0, y_drn=3.5, y_gate=6.0, tag=""):
-    """Common a multi-finger MOSFET's sources, drains and gates.
-
-    The nmos PCell draws each finger separately and does NOT connect them:
-    a w=139u ng=20 device extracts as twenty 6.95 um transistors in series
-    with twenty floating gates. DRC passes it, and a connectivity check that
-    only probes one terminal passes it too. LVS is what catches it.
-
-    Diffusion strips alternate source, drain, source... in x, so the even
-    ones bus together and the odd ones bus together. Each bus runs on Metal2
-    at its own y, with vias only onto its own strips, so the three buses can
-    cross over each other's fingers without touching.
-    """
-    cell = layout.cell(inst.cell_index)
-
-    # Diffusion strips: narrow and tall. The guard ring pieces are either
-    # much wider (the horizontal bars) or sit outside the active area.
-    strips = []
-    for sh in cell.shapes(LI["M1"]).each():
-        b = sh.dbbox()
-        if b.width() < 0.25 and b.height() > 2.0:
-            strips.append(b.transformed(inst.dcplx_trans))
-    strips.sort(key=lambda b: b.center().x)
-
-    gates = [sh.dbbox().transformed(inst.dcplx_trans)
-             for sh in cell.shapes(LI["poly"]).each()]
-    gates.sort(key=lambda b: b.center().x)
-
-    if len(strips) < 3:
-        return 0, 0
-
-    sb = strips[0].bottom
-    sh_ = strips[0].height()
-    ys = sb + 0.20 * sh_
-    yd = sb + 0.55 * sh_
-    yg = sb + 0.85 * sh_
-
-    src = strips[0::2]
-    drn = strips[1::2]
-
-    for group, ylev in ((src, ys), (drn, yd)):
-        for b in group:
-            drop(b.center().x, ylev, "M2", cols=1, rows=1)
-        if len(group) > 1:
-            wire("M2", group[0].center().x, ylev,
-                 group[-1].center().x, ylev, 0.4)
-
-    for b in gates:
-        drop(b.center().x, yg, "M2", cols=1, rows=1, frm="GatPoly")
-    if len(gates) > 1:
-        wire("M2", gates[0].center().x, yg, gates[-1].center().x, yg, 0.4)
-
-    print(f"  {tag:8} {len(src)} source + {len(drn)} drain strips, "
-          f"{len(gates)} gates bussed")
-    return len(strips), len(gates)
-
-
-print("\n=== commoning multi-finger devices ===")
-for tag, dev in (("XSW0", find("nmos", x=-8.0, y=-108.0)),
-                 ("XSW1", find("nmos", x=-8.0, y=-130.0)),
-                 ("XMR2", XMR2), ("XMR1", XMR1),
-                 ("XMT2", XMT2), ("XMT1", XMT1),
-                 ("XMB2A", MB2A), ("XMB1A", MB1A),
-                 ("XMB2B", MB2B), ("XMB1B", MB1B)):
-    if dev:
-        bus_fingers(dev, tag=tag)
 
 layout.write(OUT)
 print(f"\nwrote {OUT}")

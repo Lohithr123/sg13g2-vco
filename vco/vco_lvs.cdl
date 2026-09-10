@@ -1,99 +1,92 @@
 * VCO for LVS — IHP SG13G2
 *
-* SYNTAX NOTE, hard-won
+* Regenerated from build_layout.py to match what was actually built. The
+* previous netlist described the 4-bit bank with 4.16/8.32/16.64/33.28 fF
+* capacitors, which the process cannot make: the smallest DRC-clean cmim is
+* 10 fF. The bank is now 2-bit with 10 and 20 fF capacitors, and the varactor
+* went from Nx=2 to Nx=4 to bridge the wider steps.
 *
-* The PDK installs a custom NetlistSpiceReaderDelegate (custom_reader.lvs) that
-* intercepts elements M, C, R, Q, L and D. For those it reads the device model
+* SYNTAX NOTES, both learned the hard way
+*
+* The PDK installs a custom NetlistSpiceReaderDelegate (custom_reader.lvs)
+* that intercepts M, C, R, Q, L and D. For those it takes the device model
 * from a MODEL= PARAMETER, not from the positional slot standard SPICE uses:
 *
 *     right:  R1 a b 100k MODEL=rhigh
 *     wrong:  R1 a b rhigh 100k        <- model ignored, class lookup fails
-*     wrong:  R1 a b 100k              <- builds a default class with A/B
-*                                         terminals, which collides with the
-*                                         PDK's registered classes
 *
-* Both wrong forms fail with "Invalid terminal name: 'A'", which points at
-* terminals rather than at the model, and sends you looking in the wrong place.
+* And a poly resistor needs THREE nodes, not two — the third is the substrate
+* under the poly. Two nodes gives "Poly resistor should have 3 nodes".
 *
-* Device classes the extractors register (from extract_devices calls):
-*   caps        cap_cmim, rfcmim
-*   resistors   rhigh, rppd, rsil
-*   bipolars    npn13G2, npn13G2l, npn13G2v, pnpMPA
-*   varactor    sg13_hv_svaricap
-*   inductors   inductor, inductor3
-*
-* Choices here: rfcmim for everything capacitive, since the tank runs at
-* 20 GHz and the RF variant is the one characterised for it; rhigh for the
-* 10k and 100k values, which reach those in sane area.
-*
-* Circuit only — no models, no sources, no analysis. Literals throughout
-* because LVS does not evaluate expressions.
+* Device counts, taken from the layout:
+*   2  npn13G2 Nx=1     cross-coupled pair
+*   2  npn13G2 Nx=2     output buffers
+*   4  cmim              bank, 2 branches x 2 plates
+*   1  cmim              fixed tank capacitor
+*   2  cmim              coupling capacitors
+*   1  SVaricap Nx=4     varactor
+*   2  nmos              bank switches
+*   2  nmos w=70u        tail mirror
+*   2  nmos w=10u        reference branch
+*   4  nmos w=139u       buffer mirrors
+*   3  rhigh 10k         two gate bias, one reference
+*   4  rhigh 100k        bleed resistors
+*   1  inductor3         tank, 3 terminals
 
-.subckt vco_20g vcc gnd vt vg nb0 nb1 nb2 nb3 outbp outbn
+.subckt vco_20g vcc gnd vt vg nb0 nb1 outbp outbn
 
 * ---- tank inductor ----
-* Three terminals: LA and LB are the tank ends, LC the centre tap feeding the
-* supply. Series loss is not a device — in layout it is a property of the
-* metal, and LVS checks connectivity and device type rather than Q.
+* LA and LB are the tank ends, LC the centre tap feeding the supply.
 XL1 outp outn vcc inductor3_N2_Do110.59_w6_s3
 
 * ---- fixed tank capacitance ----
-CT outp outn 31.6f MODEL=rfcmim
+CT outp outn 31.6f MODEL=cmim
 
 * ---- varactor, DC-blocked ----
-CC1 outp gp 4p MODEL=rfcmim
-CC2 outn gn 4p MODEL=rfcmim
-RB1 gp vg 10k MODEL=rhigh
-RB2 gn vg 10k MODEL=rhigh
-XCV gp vt gn gnd sg13_hv_svaricap l=0.3u w=3.74u Nx=2 Ny=1
+CC1 outp gp 4p MODEL=cmim
+CC2 outn gn 4p MODEL=cmim
+RB1 gp vg gnd 10k MODEL=rhigh
+RB2 gn vg gnd 10k MODEL=rhigh
+XCV gp vt gn gnd sg13_hv_svaricap l=0.3u w=3.74u Nx=4 Ny=1
 
-* ---- 4-bit switched capacitor bank ----
-* clsb = 2.08 fF. Each branch splits either side of its switch, so the
-* per-side capacitors are twice the binary weight.
-CB0A outp s0a 4.16f MODEL=rfcmim
-CB0B outn s0b 4.16f MODEL=rfcmim
-XSW0 s0a nb0 s0b gnd sg13_lv_nmos w=4u l=0.13u ng=1 m=1
-CB1A outp s1a 8.32f MODEL=rfcmim
-CB1B outn s1b 8.32f MODEL=rfcmim
-XSW1 s1a nb1 s1b gnd sg13_lv_nmos w=8u l=0.13u ng=1 m=1
-CB2A outp s2a 16.64f MODEL=rfcmim
-CB2B outn s2b 16.64f MODEL=rfcmim
-XSW2 s2a nb2 s2b gnd sg13_lv_nmos w=16u l=0.13u ng=1 m=1
-CB3A outp s3a 33.28f MODEL=rfcmim
-CB3B outn s3b 33.28f MODEL=rfcmim
-XSW3 s3a nb3 s3b gnd sg13_lv_nmos w=32u l=0.13u ng=1 m=1
+* ---- 2-bit switched capacitor bank ----
+* 10 fF is the smallest cmim that passes DRC. The split-capacitor arrangement
+* puts two in series either side of the switch, so a 10 fF pair gives a 5 fF
+* branch: LSB 5 fF, MSB 10 fF, span 15 fF.
+CB0A outp s0a 10f MODEL=cmim
+CB0B outn s0b 10f MODEL=cmim
+XSW0 s0a nb0 s0b gnd sg13_lv_nmos w=8u l=0.13u ng=2 m=1
+CB1A outp s1a 20f MODEL=cmim
+CB1B outn s1b 20f MODEL=cmim
+XSW1 s1a nb1 s1b gnd sg13_lv_nmos w=16u l=0.13u ng=4 m=1
 
 * Bleed resistors hold the switch nodes at a defined DC level when off.
-RBL0A s0a gnd 100k MODEL=rhigh
-RBL0B s0b gnd 100k MODEL=rhigh
-RBL1A s1a gnd 100k MODEL=rhigh
-RBL1B s1b gnd 100k MODEL=rhigh
-RBL2A s2a gnd 100k MODEL=rhigh
-RBL2B s2b gnd 100k MODEL=rhigh
-RBL3A s3a gnd 100k MODEL=rhigh
-RBL3B s3b gnd 100k MODEL=rhigh
+RBL0A s0a gnd gnd 100k MODEL=rhigh
+RBL0B s0b gnd gnd 100k MODEL=rhigh
+RBL1A s1a gnd gnd 100k MODEL=rhigh
+RBL1B s1b gnd gnd 100k MODEL=rhigh
 
 * ---- cross-coupled pair ----
 XQ1 outp outn e gnd npn13G2 Nx=1
 XQ2 outn outp e gnd npn13G2 Nx=1
 
 * ---- cascode mirror reference ----
-RREF vcc nc 10k MODEL=rhigh
-XMR2 nc nc nb gnd sg13_lv_nmos w=10u l=1u ng=1 m=1
-XMR1 nb nb gnd gnd sg13_lv_nmos w=10u l=1u ng=1 m=1
+RREF vcc nc gnd 10k MODEL=rhigh
+XMR2 nc nc nb gnd sg13_lv_nmos w=10u l=1u ng=2 m=1
+XMR1 nb nb gnd gnd sg13_lv_nmos w=10u l=1u ng=2 m=1
 
-* ---- tail mirror, 1.96 mA ----
-XMT2 e nc ntx gnd sg13_lv_nmos w=70u l=1u ng=1 m=1
-XMT1 ntx nb gnd gnd sg13_lv_nmos w=70u l=1u ng=1 m=1
+* ---- tail mirror ----
+XMT2 e nc ntx gnd sg13_lv_nmos w=70u l=1u ng=10 m=1
+XMT1 ntx nb gnd gnd sg13_lv_nmos w=70u l=1u ng=10 m=1
 
 * ---- output buffers ----
 XB1 vcc outp outbp gnd npn13G2 Nx=2
 XB2 vcc outn outbn gnd npn13G2 Nx=2
 
-* ---- buffer tail mirrors, 4.15 mA each ----
-XMB2A outbp nc nbx1 gnd sg13_lv_nmos w=139u l=1u ng=1 m=1
-XMB1A nbx1 nb gnd gnd sg13_lv_nmos w=139u l=1u ng=1 m=1
-XMB2B outbn nc nbx2 gnd sg13_lv_nmos w=139u l=1u ng=1 m=1
-XMB1B nbx2 nb gnd gnd sg13_lv_nmos w=139u l=1u ng=1 m=1
+* ---- buffer tail mirrors ----
+XMB2A outbp nc nbx1 gnd sg13_lv_nmos w=139u l=1u ng=20 m=1
+XMB1A nbx1 nb gnd gnd sg13_lv_nmos w=139u l=1u ng=20 m=1
+XMB2B outbn nc nbx2 gnd sg13_lv_nmos w=139u l=1u ng=20 m=1
+XMB1B nbx2 nb gnd gnd sg13_lv_nmos w=139u l=1u ng=20 m=1
 
 .ends vco_20g
