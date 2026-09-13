@@ -465,7 +465,12 @@ if RB1 and RB2 and XCV:
                 (r1_top.center().x, -150.0),
                 (r2_top.center().x, -150.0),
                 (r2_top.center().x, r2_top.center().y)])
-    print(f"  vg rail at y -150")
+    # Out to a bias input on the left, so vg is a node rather than a link.
+    path("M2", [(r1_top.center().x, -150.0), (-120.0, -150.0)], w=1.0)
+    # Out to a bias input on the left edge, so vg is a driven node rather than
+    # a link between the two resistors.
+    path("M2", [(r1_top.center().x, -150.0), (-120.0, -150.0)], w=1.0)
+    print(f"  vg rail at y -150, brought out to x -120")
 
 print("\n=== varactor well to tune ===")
 # The well is the tuning input. It goes to a pad eventually; for now bring it
@@ -628,7 +633,8 @@ if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
             # side, so any lateral step passes over one of them. Go straight
             # down instead: Metal2 is empty below the mirrors, and the drains
             # are routed on Metal5.
-            wire(blyr, b.center().x, b.center().y, b.center().x, ybus, 0.21)
+            _gy = g.dbbox().bottom - 0.4
+            wire(blyr, b.center().x, _gy, b.center().x, ybus, 0.21)
         print(f"  {tag} bus at y {ybus}: {len(gs)} gates from "
               f"x {xs[0]:.1f} to {xs[-1]:.1f}")
 
@@ -658,7 +664,7 @@ for i, yb in enumerate(BANKY):
     # tail's Metal5 lane at x 0.
     # Contact the gate below the active area, where the poly extends past the
     # source and drain pins and nothing sits either side of it.
-    gy = g.bottom - 0.05
+    gy = g.top + 0.10          # on the poly bus above the diffusion
     drop(g.center().x, gy - 0.45, "M2", cols=1, rows=2)
     path("M2", [(g.center().x, gy - 0.45),
                 (g.center().x, yb - 8.0),
@@ -889,6 +895,39 @@ for _t, _d in (("XSW0", find("nmos", x=-8.0, y=-108.0)),
                ("XMB2B", MB2B), ("XMB1B", MB1B)):
     if _d:
         bus_fingers(_d, tag=_t)
+
+
+print("\n=== port labels ===")
+# LVS extracted the layout as ".SUBCKT vco_20g G1 G2 W" — three ports, and
+# those are the varactor PCell's own labels leaking through. Nothing else in
+# the layout is named, so the comparison had no anchors at all: every net was
+# an anonymous $n and could match anything or nothing.
+#
+# The deck reads net names from datatype 25 on each metal — metal1_text is
+# labels(8, 25), metal2_text labels(10, 25), and so on. A text object on the
+# right layer, sitting on the right piece of metal, names that net.
+#
+# One label per top-level port, placed where that net actually runs.
+
+PORTS = [
+    # (name, layer, x, y)
+    ("vcc",   "TM2", 0.0,    -160.0),   # supply rail
+    ("gnd",   "TM1", 0.0,    -300.0),   # ground rail
+    ("vg",    "M2",  -120.0, -150.0),   # varactor gate bias
+    ("vt",    "M2",  -20.0,  -155.0),   # tune input, on the well route
+    ("nb0",   "M2",  -38.0,  -145.0),   # band select
+    ("nb1",   "M2",  -33.0,  -145.0),
+    ("outbp", "M5",  -145.0, -95.23),   # buffer outputs
+    ("outbn", "M5",  145.0,  -95.23),
+]
+
+_TEXTLAYER = {"M1": (8, 25), "M2": (10, 25), "M3": (30, 25), "M4": (50, 25),
+              "M5": (67, 25), "TM1": (126, 25), "TM2": (134, 25)}
+
+for nm, lyr, px, py in PORTS:
+    li = layout.layer(*_TEXTLAYER[lyr])
+    top.shapes(li).insert(pya.DText(nm, pya.DTrans(snap(px), snap(py))))
+    print(f"  {nm:6} on {lyr:4} at ({px:7.1f},{py:8.1f})")
 
 layout.write(OUT)
 print(f"\nwrote {OUT}")
