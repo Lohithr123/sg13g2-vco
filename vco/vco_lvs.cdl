@@ -1,92 +1,80 @@
 * VCO for LVS — IHP SG13G2
 *
-* Regenerated from build_layout.py to match what was actually built. The
-* previous netlist described the 4-bit bank with 4.16/8.32/16.64/33.28 fF
-* capacitors, which the process cannot make: the smallest DRC-clean cmim is
-* 10 fF. The bank is now 2-bit with 10 and 20 fF capacitors, and the varactor
-* went from Nx=2 to Nx=4 to bridge the wider steps.
+* WHY THIS IS WRITTEN IN PRIMITIVE FORM
 *
-* SYNTAX NOTES, both learned the hard way
+* The PDK's custom SPICE reader (custom_reader.lvs) intercepts only the
+* element letters M, C, R, Q, L and D. Anything written as an X subcircuit
+* instance is read as a subcircuit call and never becomes a device — so a
+* netlist using "XSW0 ... sg13_lv_nmos" produces a reference circuit whose
+* devices have no class at all, and LVS finds no correspondence for anything.
+* That looks identical to a broken layout and is very hard to tell apart.
 *
-* The PDK installs a custom NetlistSpiceReaderDelegate (custom_reader.lvs)
-* that intercepts M, C, R, Q, L and D. For those it takes the device model
-* from a MODEL= PARAMETER, not from the positional slot standard SPICE uses:
+* The model is also read differently per element, which is not symmetric:
 *
-*     right:  R1 a b 100k MODEL=rhigh
-*     wrong:  R1 a b rhigh 100k        <- model ignored, class lookup fails
+*   R   from a MODEL= PARAMETER      R1 a b 100k MODEL=rhigh
+*   C   from the POSITIONAL slot     C1 a b cmim 10f
+*   M   positional                   M1 d g s b sg13_lv_nmos w=8u l=0.13u
+*   Q   positional                   Q1 c b e s npn13G2
 *
-* And a poly resistor needs THREE nodes, not two — the third is the substrate
-* under the poly. Two nodes gives "Poly resistor should have 3 nodes".
+* And a poly resistor takes three nodes, the third being the substrate.
 *
-* Device counts, taken from the layout:
-*   2  npn13G2 Nx=1     cross-coupled pair
-*   2  npn13G2 Nx=2     output buffers
-*   4  cmim              bank, 2 branches x 2 plates
-*   1  cmim              fixed tank capacitor
-*   2  cmim              coupling capacitors
-*   1  SVaricap Nx=4     varactor
-*   2  nmos              bank switches
-*   2  nmos w=70u        tail mirror
-*   2  nmos w=10u        reference branch
-*   4  nmos w=139u       buffer mirrors
-*   3  rhigh 10k         two gate bias, one reference
-*   4  rhigh 100k        bleed resistors
-*   1  inductor3         tank, 3 terminals
+* Device counts match the extracted layout: 10 MOSFETs, 4 bipolars,
+* 7 resistors, 7 capacitors, 1 varactor, 1 inductor.
+*
+* Net names are uppercase because the reader folds them; the varactor PCell
+* names its own terminals G1, G2 and W, and those labels win in the layout.
 
-.subckt vco_20g vcc gnd vt vg nb0 nb1 outbp outbn
+.subckt vco_20g VCC GND W VG NB0 NB1 OUTBP OUTBN
 
 * ---- tank inductor ----
-* LA and LB are the tank ends, LC the centre tap feeding the supply.
-XL1 outp outn vcc inductor3_N2_Do110.59_w6_s3
+* Inductor omitted: the PDK LVS deck has ind_extraction.lvs
+* commented out, so the layout extracts no inductor device.
+* The tank nodes are left as separate nets.
 
 * ---- fixed tank capacitance ----
-CT outp outn 31.6f MODEL=cmim
+CT OUTP OUTN cmim 31.6f
 
 * ---- varactor, DC-blocked ----
-CC1 outp gp 4p MODEL=cmim
-CC2 outn gn 4p MODEL=cmim
-RB1 gp vg gnd 10k MODEL=rhigh
-RB2 gn vg gnd 10k MODEL=rhigh
-XCV gp vt gn gnd sg13_hv_svaricap l=0.3u w=3.74u Nx=4 Ny=1
+CC1 OUTP G1 cmim 4p
+CC2 OUTN G2 cmim 4p
+RB1 G1 VG GND 10k MODEL=rhigh
+RB2 G2 VG GND 10k MODEL=rhigh
+CCV G1 W G2 GND sg13_hv_svaricap w=3.74u l=0.3u Nx=4
 
 * ---- 2-bit switched capacitor bank ----
-* 10 fF is the smallest cmim that passes DRC. The split-capacitor arrangement
-* puts two in series either side of the switch, so a 10 fF pair gives a 5 fF
-* branch: LSB 5 fF, MSB 10 fF, span 15 fF.
-CB0A outp s0a 10f MODEL=cmim
-CB0B outn s0b 10f MODEL=cmim
-XSW0 s0a nb0 s0b gnd sg13_lv_nmos w=8u l=0.13u ng=2 m=1
-CB1A outp s1a 20f MODEL=cmim
-CB1B outn s1b 20f MODEL=cmim
-XSW1 s1a nb1 s1b gnd sg13_lv_nmos w=16u l=0.13u ng=4 m=1
+CB0A OUTP S0A cmim 10f
+CB0B OUTN S0B cmim 10f
+MSW0 S0A NB0 S0B GND sg13_lv_nmos w=8u l=0.13u ng=2 m=1
+CB1A OUTP S1A cmim 20f
+CB1B OUTN S1B cmim 20f
+MSW1 S1A NB1 S1B GND sg13_lv_nmos w=16u l=0.13u ng=4 m=1
 
-* Bleed resistors hold the switch nodes at a defined DC level when off.
-RBL0A s0a gnd gnd 100k MODEL=rhigh
-RBL0B s0b gnd gnd 100k MODEL=rhigh
-RBL1A s1a gnd gnd 100k MODEL=rhigh
-RBL1B s1b gnd gnd 100k MODEL=rhigh
+RBL0A S0A GND GND 100k MODEL=rhigh
+RBL0B S0B GND GND 100k MODEL=rhigh
+RBL1A S1A GND GND 100k MODEL=rhigh
+RBL1B S1B GND GND 100k MODEL=rhigh
 
 * ---- cross-coupled pair ----
-XQ1 outp outn e gnd npn13G2 Nx=1
-XQ2 outn outp e gnd npn13G2 Nx=1
+QQ1 OUTP OUTN E GND npn13G2 Nx=1
+QQ2 OUTN OUTP E GND npn13G2 Nx=1
 
 * ---- cascode mirror reference ----
-RREF vcc nc gnd 10k MODEL=rhigh
-XMR2 nc nc nb gnd sg13_lv_nmos w=10u l=1u ng=2 m=1
-XMR1 nb nb gnd gnd sg13_lv_nmos w=10u l=1u ng=2 m=1
+RREF VCC NC GND 10k MODEL=rhigh
+MMR2 NC NC NB GND sg13_lv_nmos w=10u l=1u ng=2 m=1
+MMR1 NB NB GND GND sg13_lv_nmos w=10u l=1u ng=2 m=1
 
 * ---- tail mirror ----
-XMT2 e nc ntx gnd sg13_lv_nmos w=70u l=1u ng=10 m=1
-XMT1 ntx nb gnd gnd sg13_lv_nmos w=70u l=1u ng=10 m=1
+MMT2 E NC NTX GND sg13_lv_nmos w=70u l=1u ng=10 m=1
+MMT1 NTX NB GND GND sg13_lv_nmos w=70u l=1u ng=10 m=1
 
 * ---- output buffers ----
-XB1 vcc outp outbp gnd npn13G2 Nx=2
-XB2 vcc outn outbn gnd npn13G2 Nx=2
+QB1 VCC OUTP OUTBP GND npn13G2 Nx=2
+QB2 VCC OUTN OUTBN GND npn13G2 Nx=2
 
 * ---- buffer tail mirrors ----
-XMB2A outbp nc nbx1 gnd sg13_lv_nmos w=139u l=1u ng=20 m=1
-XMB1A nbx1 nb gnd gnd sg13_lv_nmos w=139u l=1u ng=20 m=1
-XMB2B outbn nc nbx2 gnd sg13_lv_nmos w=139u l=1u ng=20 m=1
-XMB1B nbx2 nb gnd gnd sg13_lv_nmos w=139u l=1u ng=20 m=1
+MMB2A OUTBP NC NBX1 GND sg13_lv_nmos w=139u l=1u ng=20 m=1
+MMB1A NBX1 NB GND GND sg13_lv_nmos w=139u l=1u ng=20 m=1
+MMB2B OUTBN NC NBX2 GND sg13_lv_nmos w=139u l=1u ng=20 m=1
+MMB1B NBX2 NB GND GND sg13_lv_nmos w=139u l=1u ng=20 m=1
 
 .ends vco_20g
