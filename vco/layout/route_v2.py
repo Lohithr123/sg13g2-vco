@@ -955,8 +955,8 @@ def bus_fingers(inst, tag=""):
                 wire("M2", b.center().x, ylev, b.center().x + _dx, ylev, 0.26)
                 wire("M2", b.center().x + _dx, ylev,
                      b.center().x + _dx, _out, 0.26)
-            wire("M2", group[0].center().x + _dx, _out,
-                 group[-1].center().x + _dx, _out, 0.26)
+            wire("M2", group[0].center().x + _dx - 0.13, _out,
+                 group[-1].center().x + _dx + 0.13, _out, 0.26)
 
     # Gates need no contact at all.
     #
