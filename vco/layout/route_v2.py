@@ -238,8 +238,8 @@ print("=== outn on Metal4 ===")
 drop(c2.x + 0.7, c2.y, "M4")
 drop(b1.x - 0.7, b1.y, "M4")
 drop(9.0, -86.0, "M4")
-path("M4", [(c2.x + 0.7, c2.y), (16.0, c2.y), (16.0, -109.0),
-            (b1.x - 0.7, -109.0), (b1.x - 0.7, b1.y)])
+path("M4", [(c2.x + 0.7, c2.y), (16.0, c2.y), (16.0, -103.0),
+            (b1.x - 0.7, -103.0), (b1.x - 0.7, b1.y)])
 path("M4", [(c2.x + 0.7, c2.y), (9.0, -86.0)])
 wire("TM1", 9.0, -85.3, 9.0, -86.0, 6.0)
 
@@ -264,7 +264,7 @@ path("M5", [(-6.0, -104.0), (6.0, -104.0)], w=1.0)
 # then transition to Metal5 for the run to the mirror.
 path("M5", [(0.0, -104.0), (0.0, -190.0),
             (d.center().x, -190.0),
-            (d.center().x, d.center().y)], w=2.0)
+            (d.center().x, d.center().y)], w=0.6)
 drop(d.center().x, d.center().y, "M5")
 
 
@@ -321,7 +321,20 @@ for i, yb in enumerate(BANKY):
                 (ta.center().x, ta.center().y)])
     drop(ta.center().x, ta.center().y, "TM1", frm="Metal3")
 
-    path("M4", [(16.0, -109.0), (16.0, tb.center().y),
+    # MEASURED: this route drew Metal4 at y -109.5..-108.5 running from
+    # x -9.700 to +16.000, straight across XSW0 whose strips span y -110..-106
+    # at x -8.51 and -8.00. Both switch stacks reach Metal4 on their way to
+    # Metal5, so the route shorted the switch's source to its drain — the last
+    # of the four drain-source shorts, and present since the bank was first
+    # wired, long before any finger commoning.
+    #
+    # The capacitors sit at x +/-25 and the switch at x -8, so the horizontal
+    # leg has to pass the switch's column. Move it out of the device's row
+    # instead: the strips end at y -106.0, so routing at the capacitor's own y
+    # minus a clear 6 um puts it below the device entirely.
+    _ybr = tb.center().y - 6.0
+    path("M4", [(16.0, -109.0), (16.0, _ybr),
+                (bb_.center().x, _ybr),
                 (bb_.center().x, tb.center().y)])
     drop(bb_.center().x, bb_.center().y, "M5", frm="Metal4")
 
@@ -885,9 +898,18 @@ def bus_fingers(inst, tag=""):
     y_d = snap(y0 + 0.62 * h)
     y_g = snap(y0 + 0.80 * h)
 
-    PAD = 0.20          # half-width: via 0.19 + 0.105 enclosure
+    _pitch = (strips[1].center().x - strips[0].center().x
+              if len(strips) > 1 else 1.38)
+    PAD = 0.16 if _pitch < 0.75 else 0.20
 
     for group, ylev in ((src, y_s), (drn, y_d)):
+        # A terminal with a single strip needs nothing: the strip IS the
+        # terminal and the existing routing already lands on it. Drawing a pad
+        # and via there adds metal beside the opposite terminal for no gain —
+        # on XSW1 the drain is one strip, and its stray pad is what tied the
+        # device to its own gate net.
+        if len(group) < 2:
+            continue
         _v1 = pya.Region(top.begin_shapes_rec(layout.layer(19, 0)))
         for b in group:
             x = b.center().x
@@ -903,8 +925,38 @@ def bus_fingers(inst, tag=""):
                 snap(x - 0.095), snap(ylev - 0.095),
                 snap(x + 0.095), snap(ylev + 0.095)))
         if len(group) > 1:
-            wire("M2", group[0].center().x, ylev,
-                 group[-1].center().x, ylev, 0.4)
+            # MEASURED on XSW0: the strips span y -110.00..-106.00, so a bus
+            # at y_s = y0 + 0.12h sits at -109.52 and, 0.4 um wide, spans
+            # -109.72..-109.32. The DRAIN strip's Metal2 runs -109.440..
+            # -106.560. They overlap by 0.12 um, which is what shorts drain to
+            # source on every device where the two levels are close enough.
+            #
+            # A bus drawn across the array always crosses the opposite net,
+            # because the strips interdigitate. So the bus goes OUTSIDE the
+            # strip span, and each strip reaches it by a stub at its own x —
+            # and a stub at a source x never overlaps a drain strip's x, so
+            # nothing crosses.
+            #
+            # Space available (measured): strip ends at -110.00, guard ring
+            # Metal1 starts at -110.88, and Metal2 is empty in that 0.88 um
+            # band. Same above, between -106.00 and -105.12.
+            _out = (snap(strips[0].bottom - 0.70) if ylev == y_s
+                    else snap(strips[0].top + 0.45))
+            # MEASURED on XSW1: the drain bus runs up to strips.top + 0.45,
+            # and the band-select gate contact sits at the same height with a
+            # poly pad spanning x -9.115..-8.415. The drain stub at x -8.51
+            # spans -8.64..-8.38 and overlaps it, tying the drain to nb1.
+            #
+            # The gate sits on the low side of the first drain strip, so
+            # offsetting the drain stubs the other way clears it. Sources go
+            # down and need no offset: nothing is below them but the ring.
+            _dx = 0.25 if ylev == y_d else 0.0
+            for b in group:
+                wire("M2", b.center().x, ylev, b.center().x + _dx, ylev, 0.26)
+                wire("M2", b.center().x + _dx, ylev,
+                     b.center().x + _dx, _out, 0.26)
+            wire("M2", group[0].center().x + _dx, _out,
+                 group[-1].center().x + _dx, _out, 0.26)
 
     # Gates need no contact at all.
     #
