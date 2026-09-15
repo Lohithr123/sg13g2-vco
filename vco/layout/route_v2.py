@@ -941,7 +941,7 @@ def bus_fingers(inst, tag=""):
             # Metal1 starts at -110.88, and Metal2 is empty in that 0.88 um
             # band. Same above, between -106.00 and -105.12.
             _out = (snap(strips[0].bottom - 0.70) if ylev == y_s
-                    else snap(strips[0].top + 0.45))
+                    else snap(strips[0].top + 0.30))
             # MEASURED on XSW1: the drain bus runs up to strips.top + 0.45,
             # and the band-select gate contact sits at the same height with a
             # poly pad spanning x -9.115..-8.415. The drain stub at x -8.51
