@@ -952,7 +952,8 @@ def bus_fingers(inst, tag=""):
             # down and need no offset: nothing is below them but the ring.
             _dx = 0.25 if ylev == y_d else 0.0
             for b in group:
-                wire("M2", b.center().x, ylev, b.center().x + _dx, ylev, 0.26)
+                wire("M2", b.center().x, ylev,
+                     b.center().x + _dx + 0.13, ylev, 0.26)
                 wire("M2", b.center().x + _dx, ylev,
                      b.center().x + _dx, _out, 0.26)
             wire("M2", group[0].center().x + _dx - 0.13, _out,
