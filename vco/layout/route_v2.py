@@ -564,7 +564,7 @@ if all([MB2A, MB1A, MB2B, MB1B]) and XB1 and XB2:
         xapp = d2.center().x + (6.0 if d2.center().x < 0 else -6.0)
         path("M5", [(xapp, be.y), (xapp, d2.center().y - 4.0),
                     (d2.center().x, d2.center().y - 4.0),
-                    (d2.center().x, d2.center().y)], w=2.0)
+                    (d2.center().x, d2.center().y)], w=0.6)
         drop(d2.center().x, d2.center().y, "M5", cols=1, rows=2)
         top.shapes(LI["M5"]).insert(pya.DBox(
             snap(d2.center().x - 0.3), snap(d2.center().y - 1.6),

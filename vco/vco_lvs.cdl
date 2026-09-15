@@ -12,7 +12,7 @@
 * The model is also read differently per element, which is not symmetric:
 *
 *   R   from a MODEL= PARAMETER      R1 a b 100k MODEL=rhigh
-*   C   from the POSITIONAL slot     C1 a b cmim 10f
+*   C   from the POSITIONAL slot     C1 a b cap_cmim 10f
 *   M   positional                   M1 d g s b sg13_lv_nmos w=8u l=0.13u
 *   Q   positional                   Q1 c b e s npn13G2
 *
@@ -24,7 +24,7 @@
 * Net names are uppercase because the reader folds them; the varactor PCell
 * names its own terminals G1, G2 and W, and those labels win in the layout.
 
-.subckt vco_20g VCC GND W VG NB0 NB1 OUTBP OUTBN
+.subckt vco_20g vcc gnd vt vg nb0 nb1 outbp outbn
 
 * ---- tank inductor ----
 * Inductor omitted: the PDK LVS deck has ind_extraction.lvs
@@ -32,21 +32,21 @@
 * The tank nodes are left as separate nets.
 
 * ---- fixed tank capacitance ----
-CT OUTP OUTN cmim 31.6f
+CT OUTP OUTN cap_cmim 31.6f
 
 * ---- varactor, DC-blocked ----
-CC1 OUTP G1 cmim 4p
-CC2 OUTN G2 cmim 4p
+CC1 OUTP G1 cap_cmim 4p
+CC2 OUTN G2 cap_cmim 4p
 RB1 G1 VG GND 10k MODEL=rhigh
 RB2 G2 VG GND 10k MODEL=rhigh
-CCV G1 W G2 GND sg13_hv_svaricap w=3.74u l=0.3u Nx=4
+CCV G1 vt G2 GND sg13_hv_svaricap w=3.74u l=0.3u Nx=4
 
 * ---- 2-bit switched capacitor bank ----
-CB0A OUTP S0A cmim 10f
-CB0B OUTN S0B cmim 10f
+CB0A OUTP S0A cap_cmim 10f
+CB0B OUTN S0B cap_cmim 10f
 MSW0 S0A NB0 S0B GND sg13_lv_nmos w=8u l=0.13u ng=2 m=1
-CB1A OUTP S1A cmim 20f
-CB1B OUTN S1B cmim 20f
+CB1A OUTP S1A cap_cmim 20f
+CB1B OUTN S1B cap_cmim 20f
 MSW1 S1A NB1 S1B GND sg13_lv_nmos w=16u l=0.13u ng=4 m=1
 
 RBL0A S0A GND GND 100k MODEL=rhigh
