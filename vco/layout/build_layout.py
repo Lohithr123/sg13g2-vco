@@ -139,6 +139,16 @@ BANK = [
     # 5 fF LSB spans 15 fF and gives ~13.6% tuning — slightly more than the
     # unbuildable 4-bit design, because the steps are coarser but the span is
     # wider. The cost is 4 bands instead of 16, so KVCO rises roughly 4x.
+    # MEASURED: with ng=2 and ng=4 the switch strips sit on a 0.51 um pitch,
+    # which leaves 0.300 um between adjacent via stacks. A compliant Metal2
+    # track needs 0.21 width plus 0.21 clearance either side = 0.630 um, so
+    # nothing can be routed between those strips on any layer. That is what
+    # left four irreducible M2.b violations when the fingers were commoned.
+    #
+    # ng=1 gives one strip per terminal, so there is nothing to common and the
+    # commoning adds no metal to these devices at all. The finger is wider and
+    # the device grows in x, but the switches sit at x -8 with the bank
+    # capacitors at +/-25, so there is room.
     (-108.0, "10f", "8u",  "2"),
     (-130.0, "20f", "16u", "4"),
 ]
