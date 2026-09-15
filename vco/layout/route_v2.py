@@ -710,7 +710,8 @@ for i, yb in enumerate(BANKY):
     drop(g.center().x, cy, "M2", cols=1, rows=1)
 
     path("M2", [(g.center().x, cy),
-                (g.center().x, yb - 8.0),
+                (g.center().x - 2.5, cy),
+                (g.center().x - 2.5, yb - 8.0),
                 (-38.0 + 5.0 * i, yb - 8.0),
                 (-38.0 + 5.0 * i, -145.0)], w=0.4)
     print(f"  bit {i}: gate at ({g.center().x:.2f},{g.center().y:.2f}) "
