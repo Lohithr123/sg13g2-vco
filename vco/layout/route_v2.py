@@ -950,7 +950,8 @@ def bus_fingers(inst, tag=""):
             # The gate sits on the low side of the first drain strip, so
             # offsetting the drain stubs the other way clears it. Sources go
             # down and need no offset: nothing is below them but the ring.
-            _dx = 0.25 if ylev == y_d else 0.0
+            _mir = -1.0 if inst.dcplx_trans.is_mirror() else 1.0
+            _dx = _mir * 0.25 if ylev == y_d else 0.0
             for b in group:
                 wire("M2", b.center().x, ylev,
                      b.center().x + _dx + 0.13, ylev, 0.26)
