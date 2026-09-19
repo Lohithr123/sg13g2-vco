@@ -530,7 +530,7 @@ if XB1 and XB2:
                 (bb1.x - 1.2, bb1.y)])
 
     drop(bb2.x + 1.2, bb2.y, "M4")
-    path("M4", [(16.0, -109.0), (40.0, -109.0), (40.0, bb2.y),
+    path("M4", [(16.0, -103.0), (40.0, -103.0), (40.0, bb2.y),
                 (bb2.x + 1.2, bb2.y)])
 
     # --- buffer emitters: out to the die edge on Metal5 ---
