@@ -214,8 +214,6 @@ XQ1 = find("npn13G2", x=-9.0, y=-100.0)
 XQ2 = find("npn13G2", x=9.0, y=-100.0)
 XMT2 = find("nmos", x=-20.0, y=-190.0, wmin=10)
 XMT1 = find("nmos", x=20.0, y=-190.0, wmin=10)
-XMR2 = find("nmos", x=-55.0, y=-190.0)
-XMR1 = find("nmos", x=-42.0, y=-190.0)
 for nm, o in [("XQ1", XQ1), ("XQ2", XQ2), ("XMT2", XMT2), ("XMT1", XMT1)]:
     print(f"  {nm:5} {'ok' if o else 'NOT FOUND'}")
 
@@ -595,6 +593,65 @@ if all([MB2A, MB1A, MB2B, MB1B]) and XB1 and XB2:
               f"({d2.center().x:.1f},{d2.center().y:.1f})")
 
 
+print("\n=== mirror gate buses ===")
+# One reference branch biases every mirror in the design: XMR2's gate drives
+# all the cascode gates, XMR1's drives all the lower gates. Six devices on two
+# buses.
+#
+# Poly is resistive, so each gate gets a via up to Metal5 immediately and the
+# run happens there. These are DC nodes with no signal on them, but they still
+# must not cross Metal3 or Metal4 — those carry the tank.
+#
+# The two buses run at different y so they never meet: cascodes at y -215,
+# lower gates at y -220, both below the mirror row at -190 and above the
+# buffer mirrors at -200... which they are not. Use -172 and -178 instead,
+# in the gap between the varactor row and the mirror row.
+
+XMR2 = find("nmos", x=-55.0, y=-190.0)
+XMR1 = find("nmos", x=-42.0, y=-190.0)
+for nm, o in [("XMR2", XMR2), ("XMR1", XMR1)]:
+    print(f"  {nm:6} {'ok' if o else 'NOT FOUND'}")
+
+if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
+    def gate(inst):
+        g = pins(inst, 5, 2)
+        return g[0] if g else None
+
+    casc = [XMR2, XMT2, XMT1, MB2A, MB2B]      # upper devices
+    lower = [XMR1, XMT1, XMT2, MB1A, MB1B]     # lower devices
+
+    # The tail cascode pair is XMT2 over XMT1, and the buffer pairs XMB2 over
+    # XMB1, so the cascode bus takes XMT2/MB2A/MB2B and the lower bus takes
+    # XMT1/MB1A/MB1B.
+    casc = [XMR2, XMT2, MB2A, MB2B]
+    lower = [XMR1, XMT1, MB1A, MB1B]
+
+    for tag, group, ybus, blyr in (("cascode", casc, -212.0, "M2"),
+                                   ("lower", lower, -184.0, "M2")):
+        gs = [(g, gate(g)) for g in group]
+        gs = [(g, b) for g, b in gs if b is not None]
+        if len(gs) < 2:
+            print(f"  {tag} bus: too few gates found, skipped")
+            continue
+        xs = sorted(b.center().x for _, b in gs)
+        # Spine across the full span, then a stub down or up to each gate.
+        wire(blyr, xs[0], ybus, xs[-1], ybus, 1.0)
+        for g, b in gs:
+            drop(b.center().x, b.center().y, blyr, cols=1, rows=2)
+            # Step away from the device's own source/drain pins, which sit
+            # only ~0.35 um from the gate. A fixed direction cannot work: at
+            # the tail mirror the drain is inboard of the gate, at the buffer
+            # mirrors the emitter lane is outboard.
+            # The gate sits between source and drain with only 0.7 um either
+            # side, so any lateral step passes over one of them. Go straight
+            # down instead: Metal2 is empty below the mirrors, and the drains
+            # are routed on Metal5.
+            _gy = g.dbbox().bottom - 0.4
+            wire(blyr, b.center().x, _gy, b.center().x, ybus, 0.21)
+        print(f"  {tag} bus at y {ybus}: {len(gs)} gates from "
+              f"x {xs[0]:.1f} to {xs[-1]:.1f}")
+
+
 print("\n=== bank switch gates ===")
 # Two control inputs, one per bank bit. These select the band, so they are
 # static logic levels — no signal, no timing constraint, and the only thing
@@ -916,7 +973,7 @@ def bus_fingers(inst, tag=""):
     # gate, bussing them on poly drives all of them with nothing added.
     if len(gates) > 1:
         gy0 = strips[0].top + 0.075     # Gat.d: 0.07 um clear of Activ
-        gy1 = strips[0].top + 0.750     # tall enough to hold a contact
+        gy1 = gy0 + 0.16                # Gat.a: 0.13 um minimum poly width
         if gy1 > gy0 + 0.05:
             top.shapes(LI["poly"]).insert(pya.DBox(
                 snap(gates[0].left), snap(gy0),
@@ -969,78 +1026,6 @@ for nm, lyr, px, py in PORTS:
     li = layout.layer(*_TEXTLAYER[lyr])
     top.shapes(li).insert(pya.DText(nm, pya.DTrans(snap(px), snap(py))))
     print(f"  {nm:6} on {lyr:4} at ({px:7.1f},{py:8.1f})")
-
-# The gate bus runs AFTER the commoning: it contacts the poly bar that
-# bus_fingers draws and reads what the commoning records. Running it
-# before — as the file originally did — placed the contact before the bar
-# existed, which is why all eight mirror gates extracted as isolated nets
-# and the tail and buffer current sources had no bias at all.
-
-print("\n=== mirror gate buses ===")
-# One reference branch biases every mirror in the design: XMR2's gate drives
-# all the cascode gates, XMR1's drives all the lower gates. Six devices on two
-# buses.
-#
-# Poly is resistive, so each gate gets a via up to Metal5 immediately and the
-# run happens there. These are DC nodes with no signal on them, but they still
-# must not cross Metal3 or Metal4 — those carry the tank.
-#
-# The two buses run at different y so they never meet: cascodes at y -215,
-# lower gates at y -220, both below the mirror row at -190 and above the
-# buffer mirrors at -200... which they are not. Use -172 and -178 instead,
-# in the gap between the varactor row and the mirror row.
-
-for nm, o in [("XMR2", XMR2), ("XMR1", XMR1)]:
-    print(f"  {nm:6} {'ok' if o else 'NOT FOUND'}")
-
-if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
-    def gate(inst):
-        g = pins(inst, 5, 2)
-        return g[0] if g else None
-
-    casc = [XMR2, XMT2, XMT1, MB2A, MB2B]      # upper devices
-    lower = [XMR1, XMT1, XMT2, MB1A, MB1B]     # lower devices
-
-    # The tail cascode pair is XMT2 over XMT1, and the buffer pairs XMB2 over
-    # XMB1, so the cascode bus takes XMT2/MB2A/MB2B and the lower bus takes
-    # XMT1/MB1A/MB1B.
-    casc = [XMR2, XMT2, MB2A, MB2B]
-    lower = [XMR1, XMT1, MB1A, MB1B]
-
-    for tag, group, ybus, blyr in (("cascode", casc, -212.0, "M2"),
-                                   ("lower", lower, -184.0, "M2")):
-        gs = [(g, gate(g)) for g in group]
-        gs = [(g, b) for g, b in gs if b is not None]
-        if len(gs) < 2:
-            print(f"  {tag} bus: too few gates found, skipped")
-            continue
-        xs = sorted(b.center().x for _, b in gs)
-        # Spine across the full span, then a stub down or up to each gate.
-        wire(blyr, xs[0], ybus, xs[-1], ybus, 1.0)
-        for g, b in gs:
-            drop(b.center().x, b.center().y, blyr, cols=1, rows=2)
-            # Step away from the device's own source/drain pins, which sit
-            # only ~0.35 um from the gate. A fixed direction cannot work: at
-            # the tail mirror the drain is inboard of the gate, at the buffer
-            # mirrors the emitter lane is outboard.
-            # The gate sits between source and drain with only 0.7 um either
-            # side, so any lateral step passes over one of them. Go straight
-            # down instead: Metal2 is empty below the mirrors, and the drains
-            # are routed on Metal5.
-            _gy = snap(g.dbbox().top - 1.21 + 0.41)  # centre of the poly bar
-            _x = snap(b.center().x)
-            top.shapes(layout.layer(6, 0)).insert(
-                pya.DBox(_x - 0.08, _gy - 0.08, _x + 0.08, _gy + 0.08))
-            for _l in ("M1", "M2"):
-                top.shapes(LI[_l]).insert(
-                    pya.DBox(_x - 0.15, _gy - 0.15, _x + 0.15, _gy + 0.15))
-            top.shapes(layout.layer(19, 0)).insert(
-                pya.DBox(_x - 0.095, _gy - 0.095, _x + 0.095, _gy + 0.095))
-            wire(blyr, _x, _gy, _x, ybus, 0.26)
-        print(f"  {tag} bus at y {ybus}: {len(gs)} gates from "
-              f"x {xs[0]:.1f} to {xs[-1]:.1f}")
-
-
 
 layout.write(OUT)
 print(f"\nwrote {OUT}")
