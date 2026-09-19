@@ -32,34 +32,34 @@
 * The tank nodes are left as separate nets.
 
 * ---- fixed tank capacitance ----
-CT OUTP OUTN cap_cmim 31.6f
+CT OUTP OUTN cap_cmim w=4.53u l=4.53u
 
 * ---- varactor, DC-blocked ----
-CC1 OUTP G1 cap_cmim 4p
-CC2 OUTN G2 cap_cmim 4p
-RB1 G1 VG GND 10k MODEL=rhigh
-RB2 G2 VG GND 10k MODEL=rhigh
+CC1 OUTP G1 cap_cmim w=51.58u l=51.58u
+CC2 OUTN G2 cap_cmim w=51.58u l=51.58u
+RB1 G1 VG GND 10k MODEL=rhigh w=1u l=7.27u
+RB2 G2 VG GND 10k MODEL=rhigh w=1u l=7.27u
 CCV G1 vt G2 GND sg13_hv_svaricap w=3.74u l=0.3u Nx=4
 
 * ---- 2-bit switched capacitor bank ----
-CB0A OUTP S0A cap_cmim 10f
-CB0B OUTN S0B cap_cmim 10f
+CB0A OUTP S0A cap_cmim w=2.52u l=2.52u
+CB0B OUTN S0B cap_cmim w=2.52u l=2.52u
 MSW0 S0A NB0 S0B GND sg13_lv_nmos w=8u l=0.13u ng=2 m=1
-CB1A OUTP S1A cap_cmim 20f
-CB1B OUTN S1B cap_cmim 20f
+CB1A OUTP S1A cap_cmim w=3.59u l=3.59u
+CB1B OUTN S1B cap_cmim w=3.59u l=3.59u
 MSW1 S1A NB1 S1B GND sg13_lv_nmos w=16u l=0.13u ng=4 m=1
 
-RBL0A S0A GND GND 100k MODEL=rhigh
-RBL0B S0B GND GND 100k MODEL=rhigh
-RBL1A S1A GND GND 100k MODEL=rhigh
-RBL1B S1B GND GND 100k MODEL=rhigh
+RBL0A S0A GND GND 100k MODEL=rhigh w=1u l=73.73u
+RBL0B S0B GND GND 100k MODEL=rhigh w=1u l=73.73u
+RBL1A S1A GND GND 100k MODEL=rhigh w=1u l=73.73u
+RBL1B S1B GND GND 100k MODEL=rhigh w=1u l=73.73u
 
 * ---- cross-coupled pair ----
 QQ1 OUTP OUTN E GND npn13G2 Nx=1
 QQ2 OUTN OUTP E GND npn13G2 Nx=1
 
 * ---- cascode mirror reference ----
-RREF VCC NC GND 10k MODEL=rhigh
+RREF VCC NC GND 10k MODEL=rhigh w=1u l=7.27u
 MMR2 NC NC NB GND sg13_lv_nmos w=10u l=1u ng=2 m=1
 MMR1 NB NB GND GND sg13_lv_nmos w=10u l=1u ng=2 m=1
 
