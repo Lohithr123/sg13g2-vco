@@ -30,7 +30,7 @@ print("net at XSW0 pin:", n.expanded_name() if n else "none")
 for lyr in ("poly", "M1", "M2", "M5"):
     r = l2n.shapes_of_net(n, l2n.layer_by_name(lyr))
     near = [p.bbox().to_dtype(ly.dbu) for p in r.each()]
-    near = [b for b in near if -13 < b.left < -4 and -113 < b.bottom < -105]
+    near = [b for b in near if -30 < b.left < -12 and -196 < b.bottom < -182]
     if not near:
         continue
     print(f"\n  {lyr}: {len(near)} shapes near XSW1")
