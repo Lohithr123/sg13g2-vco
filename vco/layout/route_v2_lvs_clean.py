@@ -371,13 +371,13 @@ for i, yb in enumerate(BANKY):
             path("M3", [(_px0, ych), (px, ych)], w=0.4)
             drop(px, ych, "M5", cols=2, rows=2, frm="Metal3")
             path("M5", [(px, ych),
-                        (px, pin.center().y - 1.4)], w=0.3)
+                        (px, pin.center().y)], w=0.4)
         else:
             path(lyr, [(plate.center().x, plate.center().y),
                        (plate.center().x, ych),
                        (px, ych),
-                       (px, pin.center().y + 1.4)],
-                 w=0.3)
+                       (px, pin.center().y)],
+                 w=0.4)
         # A Metal1->Metal5 stack here would put metal on Metal3 and Metal4,
         # which are outp and outn — every switch pin would join both tank
         # nets. Come down to Metal2 clear of the switch, cross on Metal2, and
@@ -1065,9 +1065,7 @@ if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
             if not _polys:
                 continue
             _gy = snap(g.dbbox().top - 1.21 + 0.41)
-            # 0.1 um left of the gate centre, still on the 1 um gate: clears
-            # the mirrored devices' drain bar (measured 0.16 um -> 0.26 um).
-            _x = snap(_polys[0].center().x - 0.1)
+            _x = snap(_polys[0].center().x)
             # MEASURED: the commoning's SOURCE bus runs below each device,
             # spanning the source strips in x. The gate stub descending to the
             # gate bus at y -212 passed straight through it — every cascode
@@ -1087,8 +1085,6 @@ if XMR2 and XMR1 and XMT2 and XMT1 and all([MB2A, MB1A, MB2B, MB1B]):
                 pya.DBox(_x - 0.095, _gy - 0.095, _x + 0.095, _gy + 0.095))
             wire(blyr, _x, _gy, _xj, _gy, 0.26)
             wire(blyr, _xj, _gy, _xj, ybus, 0.26)
-            top.shapes(LI[blyr]).insert(
-                pya.DBox(_xj - 0.13, _gy - 0.13, _xj + 0.13, _gy + 0.13))
         print(f"  {tag} bus at y {ybus}: {len(gs)} gates from "
               f"x {xs[0]:.1f} to {xs[-1]:.1f}")
 
@@ -1131,22 +1127,8 @@ for _tag, _dev in (("XMR2", XMR2), ("XMR1", XMR1)):
             pya.DBox(_dx - 0.15, _dy - 0.15, _dx + 0.15, _dy + 0.15))
     top.shapes(layout.layer(19, 0)).insert(
         pya.DBox(_dx - 0.095, _dy - 0.095, _dx + 0.095, _dy + 0.095))
-    # The Metal2 above XMR2's drain at y -186.80..-186.08 is the guard ring's
-    # GROUND stack, not the drain's own - a link at the contact height ran
-    # 0.16 um below it, and extending into it tied NC to ground. Run the
-    # horizontal 0.3 um lower (0.46 um clear) and step up to the contact.
-    _gl = _gy - 0.3
-    wire("M2", _dx, _dy, _dx, _gl, 0.26)
-    wire("M2", _dx, _gl, _gx, _gl, 0.26)
-    wire("M2", _gx, _gl, _gx, _gy, 0.26)
-    for _cx in (_dx, _gx):
-        top.shapes(LI["M2"]).insert(
-            pya.DBox(_cx - 0.13, _gl - 0.13, _cx + 0.13, _gl + 0.13))
-    # On XMR1 the Metal3 link lands on this same drain via, and its pad leaves
-    # a 0.175 um slot below the lowered horizontal. Both are this drain's own
-    # metal (NB), so fill between them.
-    top.shapes(LI["M2"]).insert(
-        pya.DBox(_dx - 0.35, _dy, _dx + 0.13, _gl + 0.13))
+    wire("M2", _dx, _dy, _dx, _gy, 0.26)
+    wire("M2", _dx, _gy, _gx, _gy, 0.26)
     print(f"  {_tag}: drain ({_dx:.2f},{_dy:.2f}) tied to gate ({_gx:.2f},{_gy:.2f})")
 
 
@@ -1177,7 +1159,7 @@ if XMR2 and XMR1:
     _yr = snap(_s1[1].top)                     # route height on Metal3
     drop(_xa, _ya, "M3", cols=2, rows=2, frm="Metal2")
     drop(_xb, _yb, "M3", cols=2, rows=2, frm="Metal2")
-    path("M3", [(_xa, _ya), (_xa, _yb), (_xb, _yb)], w=0.3)
+    path("M3", [(_xa, _ya), (_xa, _yr), (_xb, _yr), (_xb, _yb)], w=0.3)
     print(f"  XMR2 source ({_xa:.2f},{_ya:.2f}) -> XMR1 drain ({_xb:.2f},{_yb:.2f}) on Metal3")
 
 
@@ -1364,10 +1346,9 @@ def _bleed_hi(tag, rinst, tap_x, tap_y, tap_layer, ymid=-170.0):
         return
     hi = sorted(pins(rinst, 8, 2), key=lambda q: q.center().y)[-1]
     hy = snap(hi.center().y)
-    _in = -1.0 if hi.center().x > 0 else 1.0
-    for dx in (4.0 * _in, 6.0 * _in):
+    for dx in (0.0, 2.0, -2.0, 4.0, -4.0):
         bx = snap(hi.center().x + dx)
-        if not _seg_clear("TM2", bx, hy, bx, ymid, 2.0, [(bx, hy)]):
+        if not _seg_clear("TM2", bx, hy, bx, ymid, 1.64, [(bx, hy)]):
             continue
         for lyr in ("M4", "M3", "M2"):
             blk = _via_clear(bx, ymid, lyr, "TM2")
@@ -1382,7 +1363,7 @@ def _bleed_hi(tag, rinst, tap_x, tap_y, tap_layer, ymid=-170.0):
             if dx:
                 path("M2", [(hi.center().x, hy), (bx, hy)], w=0.4)
             drop(bx, hy, "TM2", cols=2, rows=2, frm="Metal2")
-            path("TM2", [(bx, hy), (bx, ymid)], w=2.0)
+            path("TM2", [(bx, hy), (bx, ymid)], w=1.64)
             drop(bx, ymid, "TM2", cols=2, rows=2, frm=_STK[lyr])
             path(lyr, [(bx, ymid), (bx, tap_y), (tap_x, tap_y)], w=0.4)
             drop(tap_x, tap_y, tap_layer, cols=2, rows=2, frm=_STK[lyr])
