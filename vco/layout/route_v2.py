@@ -920,6 +920,28 @@ def bus_fingers(inst, tag=""):
                      b.center().x + _dx + 0.13, ylev, 0.26)
                 wire("M2", b.center().x + _dx, ylev,
                      b.center().x + _dx, _out, 0.26)
+                # At the switches' 0.51 um pitch the stub and its own strip's
+                # stack are joined only by the jog, leaving a 15 nm slit beside
+                # the stack (drains) or an 0.08 um gap above it (sources) -
+                # same-net slots that M2.b flags. Fill between stack and stub,
+                # reaching 0.1 um into the stack; the outer edge stays the
+                # stub's, so nothing moves toward the neighbouring strip.
+                _pt = (strips[1].center().x - strips[0].center().x
+                       if len(strips) > 1 else 9.9)
+                if _pt < 0.75:
+                    _ylo, _yhi = sorted((ylev, _out))
+                    if _out < ylev:
+                        _yhi += 0.1
+                    else:
+                        _ylo -= 0.1
+                        # The slit is beside the stack only; stop at the strip
+                        # top. Carried up to the drain bus it reached within
+                        # 0.045 um of the band-select gate contact.
+                        _yhi = min(_yhi, b.top - 0.3)
+                    _sx = b.center().x + _dx
+                    top.shapes(LI["M2"]).insert(pya.DBox(
+                        min(b.center().x - 0.105, _sx - 0.13), _ylo,
+                        max(b.center().x + 0.105, _sx + 0.13), _yhi))
             wire("M2", group[0].center().x + _dx - 0.13, _out,
                  group[-1].center().x + _dx + 0.13, _out, 0.26)
 

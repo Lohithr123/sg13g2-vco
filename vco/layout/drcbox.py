@@ -1,6 +1,6 @@
 import pya, glob, os
 from collections import defaultdict
-f = max(glob.glob('/tmp/x1/*_full.lyrdb'), key=os.path.getmtime)
+f = max(glob.glob('/tmp/aa1/*_full.lyrdb'), key=os.path.getmtime)
 rdb = pya.ReportDatabase("")
 rdb.load(f)
 g = defaultdict(list)
