@@ -319,9 +319,11 @@ for i, yb in enumerate(BANKY):
     #
     # The switch then connects to the OTHER plate of each capacitor: CBxA's
     # bottom plate and CBxB's top plate.
+    _tax = ta.center().x - 6.0
+    wire("TM1", ta.center().x, ta.center().y, _tax, ta.center().y, 1.64)
     path("M3", [(-16.0, -105.0), (-16.0, ta.center().y),
-                (ta.center().x, ta.center().y)])
-    drop(ta.center().x, ta.center().y, "TM1", frm="Metal3")
+                (_tax, ta.center().y)])
+    drop(_tax, ta.center().y, "TM1", frm="Metal3")
 
     # MEASURED: this route drew Metal4 at y -109.5..-108.5 running from
     # x -9.700 to +16.000, straight across XSW0 whose strips span y -110..-106
@@ -335,7 +337,7 @@ for i, yb in enumerate(BANKY):
     # instead: the strips end at y -106.0, so routing at the capacitor's own y
     # minus a clear 6 um puts it below the device entirely.
     _ybr = tb.center().y - 6.0
-    path("M4", [(16.0, -109.0), (16.0, _ybr),
+    path("M4", [(16.0, -103.0), (16.0, _ybr),
                 (bb_.center().x, _ybr),
                 (bb_.center().x, tb.center().y)])
     drop(bb_.center().x, bb_.center().y, "M5", frm="Metal4")
@@ -353,11 +355,29 @@ for i, yb in enumerate(BANKY):
                                            tx + 0.5, tb.center().y + 0.5),
                                   "M5", drn, ybot)):
         px = pin.center().x
-        path(lyr, [(plate.center().x, plate.center().y),
-                   (plate.center().x, ych),
-                   (px, ych),
-                   (px, pin.center().y + (2.0 if ych > yb else -2.0))],
-             w=0.4)
+        if ych == ybot:
+            # MEASURED: the B-side capacitor is at x +25 and its switch at
+            # x -8, so this horizontal crosses x = 0 — where the tail runs on
+            # Metal5 from y -104 to -190. Both bank rows (y -113.5, -135.5)
+            # fall inside that span, so S0B and S1B extracted as E: the B-side
+            # switch nodes were shorted to the tail.
+            #
+            # Cross on Metal3 instead. At these heights Metal3 holds nothing
+            # between x -8 and +31 (outp is at x -16), and the via corners are
+            # clear of outn's Metal4 (at x +16 and along y -103).
+            _px0 = plate.center().x
+            path("M5", [(_px0, plate.center().y), (_px0, ych)], w=0.4)
+            drop(_px0, ych, "M5", cols=2, rows=2, frm="Metal3")
+            path("M3", [(_px0, ych), (px, ych)], w=0.4)
+            drop(px, ych, "M5", cols=2, rows=2, frm="Metal3")
+            path("M5", [(px, ych),
+                        (px, pin.center().y)], w=0.4)
+        else:
+            path(lyr, [(plate.center().x, plate.center().y),
+                       (plate.center().x, ych),
+                       (px, ych),
+                       (px, pin.center().y)],
+                 w=0.4)
         # A Metal1->Metal5 stack here would put metal on Metal3 and Metal4,
         # which are outp and outn — every switch pin would join both tank
         # nets. Come down to Metal2 clear of the switch, cross on Metal2, and
@@ -406,7 +426,7 @@ if XCV and CC1 and CC2:
     wire("TM1", tx1, t1.center().y, t1.center().x, t1.center().y, 1.64)
 
     # outn (Metal4) down to CC2's bottom plate.
-    path("M4", [(16.0, -109.0), (16.0, -234.0),
+    path("M4", [(16.0, -103.0), (16.0, -234.0),
                 (b2c.center().x, -234.0), (b2c.center().x, b2c.center().y)])
     drop(b2c.center().x, b2c.center().y, "M5", frm="Metal4")
 
