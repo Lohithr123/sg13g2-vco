@@ -15,11 +15,13 @@ laptop.
 | Output | −2.4 to −3.0 dBm differential into 50 Ω |
 | Supply | 3.3 V; 6.6 mW core, 33 mW including buffers |
 | Tank | 0.901 nH, Q 9.68 at 20 GHz, EM-extracted |
-| Layout | 29 devices, 300 × 433 µm, DRC clean, 11 nets routed |
+| Layout | 29 devices, 300 × 433 µm, **DRC clean and LVS clean** |
 | FoM | −181.6 dBc/Hz |
 
 Every figure comes from simulation of components characterised in this
-process, not from datasheet values or textbook estimates.
+process, not from datasheet values or textbook estimates. DRC excludes the
+metal-density rules, which need fill; LVS excludes the inductor, which the PDK
+deck does not extract. Both are covered under [Limitations](#5-limitations).
 
 ## Why this circuit
 
@@ -283,11 +285,13 @@ dominated by spectral leakage, not oscillator noise.
 Scripted rather than drawn. The tank is differential, and any mismatch between
 the two sides becomes oscillator imbalance directly — hand-placing mirrored
 devices is exactly where that error creeps in. Every differential pair is
-placed as a computed reflection about x = 0, and every net is checked by
-extracting the layout and comparing which terminals share a net against what
-the circuit requires.
+placed as a computed reflection about x = 0.
 
-**29 devices, 300 × 433 µm, DRC clean, 11 nets routed and verified.**
+**29 devices, 300 × 433 µm. DRC clean excluding metal density; LVS clean
+against the schematic netlist in strict port mode.**
+
+The second of those took far longer than the first, and found far more. Most
+of this section is about why.
 
 ### Two constraints that only appeared at layout
 
@@ -328,21 +332,20 @@ Re-simulated to confirm the bands still overlap:
 
 Continuous, with roughly half a band of margin.
 
-### Routing: one net per layer
+### Routing: one net per layer, mostly
 
 The first routing attempt drew each net as a path from A to B without checking
 what already occupied that space. Every net broke differently — routes abutting
 instead of overlapping, vias landing on terminals that were already contacted,
 horizontal runs cutting through a mirror's finger array and shorting eleven
-diffusion strips together. **DRC passed on all of them.** Only extracting the
-netlist and comparing terminal groupings found the faults.
+diffusion strips together. **DRC passed on all of them.**
 
-What worked was assigning each net its own layer, because the devices occupy
-only Metal1 and below while Metal3, Metal4 and Metal5 are empty:
+What worked was assigning each main net its own layer, because the devices
+occupy only Metal1 and below while Metal3, Metal4 and Metal5 are empty:
 
 | layer | carries |
 |---|---|
-| Metal2 | mirror gate buses, band-select lines |
+| Metal2 | mirror gate buses, band-select lines, finger commoning |
 | Metal3 | `outp` |
 | Metal4 | `outn` |
 | Metal5 | tail, buffer bias |
@@ -350,6 +353,11 @@ only Metal1 and below while Metal3, Metal4 and Metal5 are empty:
 | TopMetal2 | Vcc |
 
 Two nets that must cross are then on different layers, and crossing is free.
+The short links added late — the tail cascode, the reference branch, the bank
+crossing, the bleed resistors — reuse whichever layer is empty along their
+particular path, found by measuring occupancy rather than assumed. Each one
+checks every segment and via footprint against the metal already drawn and
+refuses to draw if anything is in the way.
 
 ### Three things that cost hours
 
@@ -363,7 +371,10 @@ land *on* the terminal and rise immediately.
 passes through Metal4 — so with `outp` on Metal3 and `outn` on Metal4, every
 stack reaching a capacitor's top plate bridged the two tank nets. The fix was
 giving each net a different plate of the same capacitor: `outp` takes the
-TopMetal1 top plate, `outn` the Metal5 bottom plate.
+TopMetal1 top plate, `outn` the Metal5 bottom plate. The same stack also
+passes through the *bottom* plate if it lands inside the capacitor's
+footprint, so the top-plate connection extends TopMetal1 out of the plate and
+drops outside it.
 
 **Mirroring reverses things silently.** `DTrans(M90, dx, dy)` mirrors before it
 translates, so every mirrored device with an off-centre bounding box landed at
@@ -394,28 +405,26 @@ right — boxed in on both sides. Their psub rings still tie those devices to th
 substrate, which is what satisfies the latch-up rules, but they have no
 explicit metal path to the ground rail. That is a floorplan consequence, not a
 routing one: a design intending to route power reserves a channel for it from
-the start, or places grounded devices along a common edge. Ours did neither,
-because the floorplan was laid out to avoid device overlaps and nothing else.
+the start, or places grounded devices along a common edge.
 
 ### What LVS found
 
-The layout above is DRC clean and every net was verified by extracting the
-netlist and checking which terminals share a net. Both checks pass. Neither is
-LVS.
+At this point the layout was DRC clean, and every net had been verified by
+extracting the layout and checking which terminals shared a net. Neither of
+those is LVS. Running LVS properly — comparing the extracted netlist against
+the schematic netlist, rather than against my own expectation of it — showed
+that **as drawn, the oscillator would not have started.**
 
-Running LVS properly — comparing the extracted netlist against the schematic
-netlist rather than against my own expectation of it — found something the
-other two could not:
+#### Uncommoned fingers
 
 **Every multi-finger transistor was uncommoned.** The nmos PCell draws each
 finger separately and does not connect them. A `w=139u ng=20` device is drawn
 as twenty diffusion strips and twenty poly gates, and joining them is the
-layout's job, not the PCell's. My router contacted one drain strip, one source
-strip and one gate, and left the other nineteen of each floating.
+layout's job, not the PCell's. The router contacted one drain strip, one source
+strip and one gate, and left the rest floating.
 
-So the four buffer current mirrors, both tail devices, both reference devices
-and both bank switches — ten devices — extracted as chains of separate
-transistors in series with unconnected gates:
+So all ten MOSFETs extracted as chains of separate transistors in series with
+unconnected gates:
 
 ```
 M$1  $23 $111 $23 $1  sg13_lv_nmos L=1u W=6.95u
@@ -424,48 +433,111 @@ M$3  $24 $114 $25 $1  sg13_lv_nmos L=1u W=6.95u
 ...
 ```
 
-Sixty-six transistors where there should be ten. The circuit could not have
-worked.
+Sixty-six transistors where there should be ten.
 
 **Why the earlier checks missed it.** DRC asks whether the shapes obey the
 width and spacing rules; twenty separate fingers obey them perfectly. My
-connectivity check probed one terminal per device and compared groupings — and
-the one terminal it probed was correctly connected, because that is the one the
-router had wired. Both checks were answering a narrower question than they
-appeared to.
+connectivity check probed one terminal per device — and the one terminal it
+probed was correctly connected, because that is the one the router had wired.
+Both checks were answering a narrower question than they appeared to.
 
-**The fix** is a comb: extend alternate diffusion strips past the array and bus
-them, drains one way and sources the other, with a poly contact for the gates.
-`add_combs.py` in this repo does that, and extraction then reports the right
-devices:
+**The fix** busses the fingers from inside each device rather than in the
+0.88 µm gap to the guard ring, which the terminal routing already occupied.
+Source and drain buses run outside the strip span, above and below, and each
+strip reaches its bus through a stub at its own x — so a source stub never
+crosses a drain strip. Gates are commoned on poly: a bar above the diffusion,
+0.675 µm tall so a contact fits on it, since the gate poly's own 0.18 µm
+overhang is too small to hold one.
 
-```
-M$1   $20 $31 $20 $1  sg13_lv_nmos L=1u W=139u
-M$85  $20 $51 $43 $1  sg13_lv_nmos L=1u W=70u
-M$81  $20 $49 $34 $1  sg13_lv_nmos L=1u W=10u
-```
+#### What else it found
 
-**What blocks integrating it.** The gap between the diffusion strips and the
-guard ring is 0.88 µm. A 0.3 µm bus with the required 0.21 µm clearance either
-side needs 0.72 µm of that, which fits — but the terminal connections drawn
-earlier in the flow also live in that gap, because they were routed on the
-assumption that a single strip was the terminal. The gap holds the bus or the
-terminal routing, not both.
+Once the devices extracted correctly, the comparison could see the wiring
+between them. Every one of these passed DRC:
 
-Making both fit means reworking how every device terminal is contacted:
-routing from the bus rather than from a strip, across the bank, the tail, the
-buffer bias and the gate buses. That is a floorplan decision made too late —
-the same lesson as the ground routing, arriving in a different form. A layout
-that intends to bus its fingers leaves room for the bus before it starts
-routing.
+| fault | consequence | cause |
+|---|---|---|
+| All eight mirror gates isolated | tail and buffer current sources unbiased | three at once — the gate-bus code ran before the poly bar it contacts existed; the contact then landed on gate poly over active (`Cnt.j`); the stub then descended through the source bus |
+| RREF's lower end unconnected | no reference current anywhere | never routed |
+| Reference branch not diode-connected | nothing set the two bias voltages | never routed |
+| XMR2's source not on NB, tail cascode not stacked | reference and tail branches open | never routed |
+| Bank capacitors never reached their switches | the bank did nothing | routes stopped 2.0 µm from each pin; the stack there reaches only 1.58 µm — a 0.42 µm gap |
+| B-side switch nodes shorted to the tail | bank tied to the emitter node | its Metal5 crossing ran through the tail's Metal5 at x = 0 |
+| A-side switch nodes shorted to `outp` | bank bypassed | the top-plate stack sat at the capacitor's centre, through the bottom plate |
+| CT floating | 31.6 fF missing from the tank | never routed |
+| Four bleed resistors floating | switch nodes undefined when off | placed at the die edge, never routed |
+| Four transistors with drain shorted to source | devices bypassed | a bias route 2.0 µm wide landing on pins 1.38 µm apart; a commoning stub landing on a gate contact; `outn`'s cross-coupling leg crossing the bank switch row |
+| `outbp` tied to `outbn` | no differential output | the cascode gate bus spanned both buffers |
+| Both band-select lines grounded | bank uncontrollable | gate contacts landed on the switches' guard rings |
 
-The committed layout is therefore DRC clean with correct net connectivity, and
-not LVS clean. The finger commoning is written and demonstrably produces the
-right devices; integrating it is the next piece of work.
+The original checks had confirmed each capacitor's *tank* side — never its
+switch side — which is how the bank passed every earlier check while
+connected to nothing.
+
+#### The last failures were in the netlist
+
+With every device and net pairing, LVS still failed, and the remaining causes
+were in how the reference netlist described correct hardware:
+
+- **The bipolars need `we` and `le`.** The extractor reports emitter geometry;
+  a netlist giving only `Nx` leaves the four transistors unpaired, and every
+  net touching them unresolved.
+- **MIM plate order matters.** The first terminal is the top plate. The three
+  capacitors with `outn` on the bottom plate were written the other way round.
+- **PCell labels become ports.** The varactor names its own terminals `G1`,
+  `G2` and `W`, and those labels win over mine. Strict port mode requires the
+  netlist's port names to match.
+
+#### Mistakes worth recording
+
+Three of my own errors cost more time than any layout fault, and all three
+are general:
+
+**Steering by a number that could not move.** For hours I tracked the count of
+"net not matching" messages. It counts *layout* nets — so it stayed constant
+through a dozen correct netlist fixes, each of which appeared to do nothing.
+The informative measure is the number of matched pairs.
+
+**Comparing net numbers across extraction runs.** They are reassigned every
+time. Reading capacitor terminals from one run against transistor terminals
+from another produced a fault that did not exist.
+
+**Assuming a nearby shape was the same net.** A Metal2 shape 0.16 µm from the
+reference diode link looked like that device's own drain connection, and I
+extended the link into it to close the gap. It was the guard ring's ground
+stack; the bias rail was now shorted to ground. Probe the net before merging.
+
+#### The last four DRC violations
+
+Four `M2.b` violations on the bank switches outlasted everything else, and for
+days I attributed them to the switches' 0.51 µm strip pitch: 0.30 µm between
+adjacent stacks, against 0.63 µm needed for a compliant track. That arithmetic
+is correct, and irrelevant. Measured properly, the violations were 10–30 nm
+wide — commoning stubs almost touching *their own* strip's stack. Same-net
+slots. Every attempt to push those shapes apart had made things worse, because
+they needed pushing together.
+
+---
 
 ## 5. Limitations
 
 Stated plainly, because they bound what the numbers mean.
+
+**The inductor is not part of the LVS comparison.** The PDK's inductor
+extraction is commented out of its LVS deck, and the reference netlist omits
+the inductor to match. LVS therefore verifies every device and net *except*
+the tank inductor's three connections, which were checked separately by
+extraction.
+
+**DRC excludes metal density.** Every run used `--no_density`. Meeting the
+density rules needs fill shapes — a routine pre-tapeout step, not a design
+error, but "DRC clean" means clean excluding density until it is done.
+
+**LVS was run with tap extraction disabled**, so guard-ring connectivity is not
+compared. See the two unreachable rings above.
+
+**No parasitic extraction yet.** Extracted parasitics will land on the tank and
+shift the band plan; the fixed capacitor will need re-trimming and the corners
+re-running. This is the next piece of work, and the real test of the layout.
 
 **Temperature corners were not simulated.** The VBIC self-heating model does
 not converge in ngspice across −40 to +125 °C for this circuit. All results
@@ -485,19 +557,6 @@ manufacturable and DRC clean, but their values come from the 1.5 fF/µm² area
 coefficient rather than the full model, so the parasitic terms are not
 guaranteed.
 
-**The layout is routed but not LVS-matched.** All eleven nets are DRC clean
-and verified by extracting the layout and checking which terminals share a net,
-but that is a check against my own expectation of the circuit, not against the
-netlist. A full LVS run would compare the two properly. There is no parasitic
-extraction either, and extracted parasitics would land on the tank and shift
-the band plan, requiring the fixed capacitor to be re-trimmed and the corners
-re-run.
-
-**Two guard rings have no metal tie to the ground rail.** The bank switches sit
-between the band-select lines and the tail with no free side. Their psub rings
-still tie them to the substrate, which is what the latch-up rules check, but a
-production layout would place them where ground can reach.
-
 **Phase noise was measured at one band code only**, and only on the 4-bit
 design. Tank Q differs across the bank, so the figure will vary.
 
@@ -505,8 +564,8 @@ design. Tank Q differs across the bank, so the figure will vary.
 
 ## 6. Toolchain issues found
 
-Four reproducible defects in the open-source flow, each of which silently
-produced wrong output rather than erroring:
+Reproducible issues in the open-source flow. Each either silently produced
+wrong output or failed without pointing at its cause.
 
 1. **gds2palace vs scikit-rf 2.x.** `skrf.connect` moved out of the top-level
    namespace; Palace's de-embedding script still expects the 1.x API. Fixed
@@ -516,15 +575,33 @@ produced wrong output rather than erroring:
    land 2–3 nm off the 5 nm manufacturing grid, so IHP's own synthesis output
    fails IHP's own DRC. Fixed by snapping.
 
-3. **KLayout's SPICE reader in this PDK takes the device model as a `MODEL=`
-   parameter, not positionally.** `R1 a b 100k MODEL=rhigh` works;
-   `R1 a b rhigh 100k` silently fails with "Invalid terminal name: 'A'",
-   which points at terminals rather than the model.
+3. **The SPICE reader takes a resistor's model as `MODEL=`, not
+   positionally.** `R1 a b 100k MODEL=rhigh` works; `R1 a b rhigh 100k` fails
+   with "Invalid terminal name: 'A'", which points at terminals rather than
+   the model. Poly resistors also need all three nodes, including substrate.
 
 4. **The nmos PCell substitutes minimum width without erroring.** `w` is total
    width and `ng` divides it into fingers; asking for `w=139u, ng=1` yields a
-   0.15 µm device and a warning buried in the log. Four mirror transistors
-   were silently the wrong size.
+   0.15 µm device and a warning buried in the log.
+
+5. **The nmos PCell does not common its fingers.** A multi-finger device is
+   drawn as unconnected strips. DRC passes it.
+
+6. **`X`-prefixed transistors are not devices to the reference reader.**
+   Writing a MOSFET as `XM1 … sg13_lv_nmos` produces no device at all; it must
+   be an `M` element, and bipolars `Q`.
+
+7. **Without `--top_lvl_pins`, nothing anchors.** The comparison has no named
+   pins to start from and reports every net unmatched, however correct the
+   circuit.
+
+8. **`run_lvs.py` reports PASS when KLayout crashes.** The summary shows
+   "Status: PASS" with the outcome "no explicit PASS/FAIL signature found". A
+   real match reads "PASS (netlists match)". Read the outcome line, not the
+   status.
+
+9. **Inductor extraction is commented out** of the PDK's LVS deck, so the
+   spiral does not extract as a device.
 
 ---
 
@@ -532,15 +609,27 @@ produced wrong output rather than erroring:
 
 ```
 git clone https://github.com/Lohithr123/sg13g2-vco.git
-cd sg13g2-vco
-cd designs
+cd sg13g2-vco/designs
+
 # circuit
 ngspice vco/vco_2bit.spice
-# layout
-klayout -z -nn $PDK_ROOT/ihp-sg13g2/libs.tech/klayout/tech/sg13g2.lyt \
-        -r vco/layout/build_layout.py
-python3 $PDK_ROOT/ihp-sg13g2/libs.tech/klayout/tech/drc/run_drc.py \
-        --path=vco/layout/vco_20g.gds --no_density
+
+# layout: place, then route
+cd vco/layout
+TECH=$PDK_ROOT/ihp-sg13g2/libs.tech/klayout/tech
+klayout -z -nn $TECH/sg13g2.lyt -r build_layout.py
+klayout -z -nn $TECH/sg13g2.lyt -r route_v2.py
+
+# DRC (excluding density)
+python3 $TECH/drc/run_drc.py --path=vco_20g_routed.gds \
+        --topcell=vco_20g --no_density
+
+# LVS
+python3 $TECH/lvs/run_lvs.py --layout=vco_20g_routed.gds \
+        --netlist=../vco_lvs.cdl --topcell=vco_20g \
+        --no_series_res --no_parallel_res \
+        --disable_tap_extraction --top_lvl_pins
 ```
 
-Requires IIC-OSIC-TOOLS with the IHP SG13G2 PDK.
+Requires IIC-OSIC-TOOLS with the IHP SG13G2 PDK. The tag
+`v1.0-drc-lvs-clean` marks the verified state.
